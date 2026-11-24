@@ -1,0 +1,88 @@
+{
+  "type": "FeatureCollection",
+  "name": "zocalo-puebla-hypothetical-demo",
+  "metadata": {
+    "status": "hypothetical",
+    "purpose": "Demonstration fixture for comparing shade and temporary market proposals",
+    "createdAt": "2026-11-22",
+    "updatedAt": "2026-11-23",
+    "license": "MIT project fixture",
+    "notObserved": true,
+    "interventionContract": "Each feature's `intervention` object matches src/lib/schemas/intervention.ts and save_revision (migration 20261122120000). Proposal A submits the canopy, proposal B the market; their footprints overlap so the merge demo shows an exclusive-zone conflict."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "demo-shade-canopy-01",
+      "properties": {
+        "kind": "shade_canopy",
+        "status": "hypothetical",
+        "scenario": "shade",
+        "name": {
+          "es": "Cubierta ligera propuesta",
+          "en": "Proposed lightweight canopy"
+        },
+        "heightMeters": 4.5,
+        "evidence": "none",
+        "intervention": {
+          "id": "d3e0a000-0000-4000-8000-00000000000a",
+          "kind": "shade_canopy",
+          "properties": {
+            "label": "Cubierta ligera propuesta",
+            "heightM": 4.5
+          }
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-98.19825, 19.04358],
+            [-98.19805, 19.04358],
+            [-98.19805, 19.04372],
+            [-98.19825, 19.04372],
+            [-98.19825, 19.04358]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "demo-market-zone-01",
+      "properties": {
+        "kind": "temporary_market",
+        "status": "hypothetical",
+        "scenario": "market",
+        "name": {
+          "es": "Zona de mercado temporal propuesta",
+          "en": "Proposed temporary market zone"
+        },
+        "stallCount": 12,
+        "timeSlot": "evaluation-demo",
+        "evidence": "none",
+        "intervention": {
+          "id": "d3e0b000-0000-4000-8000-00000000000b",
+          "kind": "temporary_market",
+          "properties": {
+            "label": "Zona de mercado temporal propuesta",
+            "stallCount": 12,
+            "moduleM2": 6,
+            "timeSlot": "Sábados 8–14 h"
+          }
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-98.19814, 19.04363],
+            [-98.19795, 19.04363],
+            [-98.19795, 19.04377],
+            [-98.19814, 19.04377],
+            [-98.19814, 19.04363]
+          ]
+        ]
+      }
+    }
+  ]
+}

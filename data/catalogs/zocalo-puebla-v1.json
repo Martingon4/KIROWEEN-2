@@ -1,0 +1,57 @@
+{
+  "siteSlug": "zocalo-puebla",
+  "siteId": "8f5a6417-5f6d-4f02-a50c-76d97167db99",
+  "version": "v1",
+  "currency": "MXN",
+  "effectiveFrom": "2026-11-22T00:00:00Z",
+  "priceDate": "2026-11-22",
+  "isIllustrative": true,
+  "assumptionOwner": "Equipo del piloto Fork the City",
+  "source": "Illustrative evaluation prices, not a supplier quote",
+  "items": [
+    {
+      "code": "shade-tree-unit",
+      "kind": "shade_tree",
+      "unit": "u",
+      "quantityFormula": "1 per tree",
+      "priceLowCents": 450000,
+      "priceHighCents": 1200000,
+      "isAssumption": true,
+      "assumptionOwner": "Equipo del piloto Fork the City",
+      "assumptionDate": "2026-11-22"
+    },
+    {
+      "code": "shade-canopy-m2",
+      "kind": "shade_canopy",
+      "unit": "m2",
+      "quantityFormula": "polygon area in m²",
+      "priceLowCents": 180000,
+      "priceHighCents": 350000,
+      "isAssumption": true,
+      "assumptionOwner": "Equipo del piloto Fork the City",
+      "assumptionDate": "2026-11-22"
+    },
+    {
+      "code": "market-stall-session",
+      "kind": "temporary_market",
+      "unit": "jornada",
+      "quantityFormula": "stallCount per session",
+      "priceLowCents": 15000,
+      "priceHighCents": 40000,
+      "isAssumption": true,
+      "assumptionOwner": "Equipo del piloto Fork the City",
+      "assumptionDate": "2026-11-22"
+    },
+    {
+      "code": "crossing-m2",
+      "kind": "proposed_crossing",
+      "unit": "m2",
+      "quantityFormula": "length in m × widthM",
+      "priceLowCents": 90000,
+      "priceHighCents": 160000,
+      "isAssumption": true,
+      "assumptionOwner": "Equipo del piloto Fork the City",
+      "assumptionDate": "2026-11-22"
+    }
+  ]
+}

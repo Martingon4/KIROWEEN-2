@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Check after task",
+      "trigger": "PostTaskExec",
+      "description": "Run fast local checks after a spec task completes and record the run in .kiro/hooks/run.log.",
+      "action": {
+        "type": "command",
+        "command": "echo \"$(date -u +%FT%TZ) PostTaskExec start\" >> .kiro/hooks/run.log && npm run lint && npm run typecheck && npm run test:unit && echo \"$(date -u +%FT%TZ) PostTaskExec ok\" >> .kiro/hooks/run.log",
+        "timeout": 300
+      }
+    }
+  ]
+}

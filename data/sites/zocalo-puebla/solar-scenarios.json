@@ -1,0 +1,31 @@
+{
+  "generator": "suncalc@1.9.0",
+  "siteId": "8f5a6417-5f6d-4f02-a50c-76d97167db99",
+  "latitude": 19.043675,
+  "longitude": -98.198094,
+  "scenarios": [
+    {
+      "slug": "equinox-1000",
+      "localDatetime": "2027-03-20T10:00:00",
+      "timezone": "America/Mexico_City",
+      "instantUtc": "2027-03-20T16:00:00.000Z",
+      "azimuthRad": 1.94519,
+      "elevationRad": 0.804819
+    },
+    {
+      "slug": "equinox-1600",
+      "localDatetime": "2027-03-20T16:00:00",
+      "timezone": "America/Mexico_City",
+      "instantUtc": "2027-03-20T22:00:00.000Z",
+      "azimuthRad": 4.440486,
+      "elevationRad": 0.654517
+    }
+  ],
+  "excluded": [
+    {
+      "slug": "equinox-1900",
+      "localDatetime": "2027-03-20T19:00:00",
+      "reason": "elevation_below_10deg"
+    }
+  ]
+}

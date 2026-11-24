@@ -1,0 +1,17 @@
+# 04 Community and moderation: tasks
+
+- [x] **1. Provisioning and rate limits** — FT-10
+  - Evidence: moderator test account (`FTC_MODERATOR_*`; `configure-local-env.mjs` appends missing keys without rewriting existing credentials; `provision-local-users.mjs` assigns the `moderator` role); migration `20261124010000_rate_limits.sql`; pgTAP `013_rate_limits.test.sql` (atomic consumption, bucket boundaries, `FT429` with retry seconds, no consumption on rejection or replay).
+- [x] **2. Community and moderation schema** — FT-09, FT-10
+  - Evidence: migration `20261124020000_community_tables.sql` (enums, `plain_text_ok`, `comments`, `supports`, `moderation_events`, `reports`, triggers, RLS, no table grants); pgTAP `012_community_schema.test.sql`.
+- [x] **3. Comment and support RPCs** — FT-09
+  - Evidence: `20261124030000_community_rpcs.sql`, `20261124060000_comments_mine_flag.sql`; pgTAP `014_comments_supports.test.sql` (anchors, idempotency, one support per account, keyset pagination with microseconds, `mine` flag).
+- [x] **4. Moderation RPCs** — FT-10
+  - Evidence: `20261124040000_moderation_rpcs.sql`, `20261124050000_moderation_hidden_list.sql` (added because a resolved report leaves the queue and moderators still need to restore); pgTAP `015_reports_moderation.test.sql` (4 users × 8 functions: all get `P0002`, nothing changes) and `016_hidden_effects.test.sql` (every public, compare, analysis, fork, merge, comment, support, and report path goes dark after hiding; forks and merged revisions stay intact; restore reverses it).
+- [x] **5. HTTP contract** — FT-09, FT-10
+  - Evidence: ten routes under `/api/v1` (comments, support, reports, moderation reports, hidden, targets, actions, resolve), `mapCommunityError`, `readMutationOrigin`, Proxy session refresh on public pages with a 2 s timeout; `tests/unit/community-schema.test.ts`; API matrix in `tests/e2e/community.spec.ts` including 12 parallel comments giving exactly 10 created and 2 rate-limited.
+- [x] **6. Community and moderation UI** — FT-09, FT-10, FT-16
+  - Evidence: community section on the publication page (support, comments, anchors, report, retract, author notices), `/[locale]/moderation` (queue, decision forms, hidden list with restore), Spanish and English; `tests/e2e/community.spec.ts` 15 passed and 1 skipped by design (chromium + mobile-360, axe, 360 px, keyboard, plain-text rendering of `<img onerror>`).
+- [x] **7. Close the Spec with evidence** — FT-16–FT-18
+  - Evidence: reviewer-opus review (10 findings, 3 major) fixed in `20261124070000_community_review_fixes.sql` plus app changes; after a clean `supabase db reset` and `provision:local`, `npx --yes -p node@24 -c 'npm run check:ci'` on Node v24.22.3 passed: lint, typecheck, unit 276 tests in 20 files, solar check, build, pgTAP 1957 tests in 18 files, Playwright 115 tests; captures `docs/kiro-evidence/community-1440.png`, `community-390.png`, `moderation-1440.png` (0 px horizontal overflow).
+  - Known limitations: the hidden-content list and the report queue show at most 50 items without paging; a report whose target is already hidden can be dismissed but not closed as "actioned" from the panel; the panel does not yet show the audit history (available through `GET /api/v1/moderation/targets/:kind/:id`); aliases are limited to Latin-1 letters to block homoglyphs; account deletion is blocked by `ON DELETE RESTRICT` on authors, as for publications.

@@ -1,0 +1,47 @@
+{
+  "id": "8f5a6417-5f6d-4f02-a50c-76d97167db99",
+  "slug": "zocalo-puebla",
+  "name": {
+    "es": "Plaza de la Constitución",
+    "en": "Plaza de la Constitución"
+  },
+  "sourceUrl": "https://www.openstreetmap.org/way/528509571",
+  "sourceKind": "OpenStreetMap way via Nominatim search",
+  "license": "ODbL-1.0",
+  "attribution": "© OpenStreetMap contributors",
+  "captureDate": "2026-11-22",
+  "retrievedAt": "2026-11-22T00:53:31Z",
+  "boundingBox": [
+    -98.1988758,
+    19.0430895,
+    -98.1973016,
+    19.0442743
+  ],
+  "projection": {
+    "input": "EPSG:4326",
+    "metricCandidate": "EPSG:32614",
+    "metricStatus": "pending-validation"
+  },
+  "timezone": "America/Mexico_City",
+  "currency": "MXN",
+  "completeness": "partial-boundary-only",
+  "checksum": {
+    "algorithm": "sha256",
+    "sourceCapture": "1c2ab5800578895d7a4be092704de1e9bcf9c9e1032b17ca1d34daac10bfa1e7",
+    "solarScenarios": "77c5a5b43fab4c22554dd7b187e401e0cc69974b764090c27d22a58da182d1fd"
+  },
+  "layers": [
+    {
+      "id": "study-boundary",
+      "file": "baseline.geojson",
+      "status": "reference",
+      "coverage": "single OSM square boundary"
+    },
+    {
+      "id": "evaluation-scenario",
+      "file": "scenario.geojson",
+      "status": "hypothetical",
+      "coverage": "authored demonstration fixtures; not observed on site"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+# 05 Dossiers, tracking, and exports: tasks
+
+- [x] **1. Dossier schema** — FT-13, FT-14
+  - Migration `20261125010000_dossier_tables.sql`: enums, tables, constraints, triggers (append-only events, limited changes, deferred evidence constraint), RLS, no grants.
+  - Check: pgTAP schema, constraint, trigger, and grant tests.
+  - Evidence: migration `20261125010000_dossier_tables.sql`; pgTAP `019_dossier_schema.test.sql` (part of the 2835 pgTAP tests in 24 files reported by the main session).
+- [x] **2. Write RPCs** — FT-13, FT-14
+  - Migration `20261125020000_dossier_rpcs.sql`: promote, responsible, milestones, evidence, transitions with the full requirement matrix, revert last status change.
+  - Check: pgTAP for permissions by role and site, every matrix failure, idempotency, stale state, concurrency of promotion.
+  - Evidence: migrations `20261125020000_dossier_rpcs.sql`, `20261125040000_dossier_fixes.sql` (URL validation order), `20261125050000_dossier_evidence_trigger_definer.sql` (`SECURITY DEFINER` trigger found by E2E), `20261125060000_dossier_responsible_withdrawal.sql`; pgTAP `024_dossier_responsible_withdrawal.test.sql` in the 2835-test suite.
+- [x] **3. Read RPCs and visibility** — FT-13, FT-15
+  - Migration `20261125030000_dossier_reads.sql`: public dossier, managed dossier, publication lookup, list, exists.
+  - Check: pgTAP hidden-content effects (page, API, list, exports, writes) and restore.
+  - Evidence: migration `20261125030000_dossier_reads.sql`; hidden-content effects are covered by the pgTAP suite (2835 tests in 24 files, reported by the main session; the file-level mapping was not rechecked by the docs agent).
+- [x] **4. Export libraries** — FT-15
+  - Pure `src/lib/format/csv.ts`, `dossier-html.ts`, `src/lib/geo/export.ts`, assumptions JSON.
+  - Check: unit tests and fast-check (seed 20260514): no CSV cell keeps a formula trigger, GeoJSON validity, HTML escaping, state-machine model.
+  - Evidence: `src/lib/format/dossier-export.ts`, `src/lib/geo/export.ts`; `tests/unit/dossier-export.test.ts` and `tests/unit/geo-export.test.ts` in the 462 unit tests reported by the main session.
+- [x] **5. HTTP contract** — FT-13–FT-15
+  - Routes, Zod schemas, `mapDossierError`, export route, Proxy gate for dossier pages.
+  - Check: unit tests and API E2E matrix.
+  - Evidence: routes under `src/app/api/v1/dossiers`, `evidence`, and `milestones`; export route `src/app/api/v1/dossiers/[dossierId]/export/route.ts` (`no-store`, `nosniff`, CSP hash for HTML); covered by the 462 unit tests and the 20 E2E tests reported by the main session.
+- [x] **6. Dossier UI** — FT-13–FT-16
+  - Public page, manage page, promote control, list; Spanish and English, keyboard, 360 px, axe.
+  - Check: E2E story from R6.
+  - Evidence: `src/features/dossier/dossier-view.tsx`; `tests/e2e/dossier.spec.ts`, 20 tests passed on chromium and mobile-360, as reported by the main session.
+- [x] **7. Close the Spec with evidence** — FT-16–FT-18
+  - Independent review, full Node 24 `check:ci` after a clean reset, captures, docs.
+  - Evidence so far: independent review by `reviewer-opus`, with its findings fixed in migration `20261125060000` and in app code; decisions and limitations in `docs/adr/0006-dossiers.md`; progress and evidence updated in `docs/progress.md` and `docs/kiro-evidence.md`.
+  - Node 24 `npm run check:ci` after a clean reset: exit 0, unit 462, pgTAP 2835 (24 files), Playwright 135.
+  - Still pending: dossier captures at 1440 px and 390 px (none in `docs/kiro-evidence/`), moved to Spec 06.
