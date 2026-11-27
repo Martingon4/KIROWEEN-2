@@ -899,6 +899,14 @@ h1 {
   font-size: clamp(2.8rem, 5vw, 5rem);
 }
 
+.branch-terrain-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  margin-top: 1.25rem;
+}
+
 .branch-create form {
   padding: clamp(1.5rem, 3vw, 2.5rem);
   border: 2px solid var(--ink);
@@ -953,14 +961,17 @@ h1 {
 .branch-list ol {
   margin: 0;
   padding: 0;
-  border-top: 2px solid var(--ink);
   list-style: none;
+  display: grid;
+  gap: 0.65rem;
 }
 
 .branch-list li {
   min-height: 5.5rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--line);
+  padding: 0.9rem clamp(0.75rem, 2vw, 1.25rem);
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--ink);
+  background: white;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -970,10 +981,17 @@ h1 {
 .branch-list li div {
   display: grid;
   gap: 0.25rem;
+  min-width: 0;
 }
 
 .branch-list li strong {
   font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.branch-list li > .button {
+  flex: none;
+  width: auto;
 }
 
 .branch-list li span,
@@ -1080,6 +1098,47 @@ h1 {
   align-items: start;
 }
 
+.editor-workspace {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: inherit;
+  grid-template-areas:
+    "plan picker"
+    "plan placement";
+  column-gap: inherit;
+  row-gap: 1rem;
+  align-items: start;
+}
+
+.editor-workspace > .editor-canvas {
+  grid-area: plan;
+}
+
+.editor-picker {
+  grid-area: picker;
+}
+
+.editor-placement {
+  grid-area: placement;
+}
+
+.editor-preview-help {
+  padding: 0 1.25rem;
+}
+
+.editor-next-step {
+  margin: 0.45rem 0 0;
+  border-top: 1px solid var(--line);
+  padding-top: 0.65rem;
+  font-weight: 700;
+  color: var(--slate);
+}
+
+#editor-preview-title:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
 .draft-offer {
   grid-column: 1 / -1;
   padding: 1.25rem;
@@ -1153,6 +1212,12 @@ h1 {
   stroke-width: 10;
 }
 
+.preview-conflict {
+  stroke: #9f1239;
+  stroke-width: 9;
+  stroke-dasharray: 12 7;
+}
+
 .pending-state {
   margin: 0;
   padding: 0.85rem 1.25rem;
@@ -1168,7 +1233,6 @@ h1 {
 
 .editor-list-title {
   padding: 1.25rem 1.25rem 0.5rem;
-  border-top: 1px solid var(--ink);
 }
 
 .editor-canvas .empty-message {
@@ -1312,7 +1376,11 @@ h1 {
 
 @media (max-width: 900px) {
   .editor-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editor-workspace {
+    grid-template-areas: "picker" "plan" "placement";
   }
 
   .branches-header {
@@ -1500,6 +1568,74 @@ h1 {
 .publication-page > section > .field-help {
   margin: 0.5rem 0;
 }
+
+.publication-page > .compare-overview {
+  margin-top: 1.5rem;
+}
+
+.compare-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.compare-overview-grid > div {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.compare-overview-grid > .compare-overlap-alert {
+  border-color: var(--market);
+  background: var(--market-light);
+}
+
+.compare-overview-grid h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.compare-overview-grid p {
+  margin: 0 0 0.5rem;
+}
+
+.compare-overview-grid ul {
+  padding-left: 1rem;
+  margin: 0.5rem 0;
+}
+
+.compare-overview-grid li > span {
+  display: block;
+}
+
+.compare-overview-value {
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+.compare-overview-costs {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.compare-overview-costs dt {
+  color: var(--slate);
+  font-size: 0.9rem;
+}
+
+.compare-overview-costs dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .compare-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .compare-table-wrap:focus-visible {
   outline: 4px solid var(--focus);
   outline-offset: 2px;
@@ -1524,6 +1660,56 @@ h1 {
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
+}
+
+.shade-scene-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.shade-scene-controls label {
+  display: grid;
+  flex: 1 1 10rem;
+  min-width: 0;
+  gap: 0.25rem;
+  font-weight: 700;
+}
+
+.shade-scene-controls select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid var(--slate);
+  background: var(--surface);
+}
+
+.shade-scene-controls select:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.shade-scene-figure {
+  margin: 0;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.shade-scene {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #e9f1f6;
+}
+
+.shade-scene-figure figcaption {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
 }
 
 .compare-table thead th {
@@ -1942,6 +2128,9 @@ h1 {
 }
 
 .dossier-home-link {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1.25rem;
   width: min(92%, 72rem);
   margin: 0 auto;
   padding: 1.5rem 0 3rem;
@@ -1980,4 +2169,635 @@ h1 {
   align-items: center;
   cursor: pointer;
   font-weight: 700;
+}
+
+.shade-scene-ground {
+  cursor: crosshair;
+}
+
+.shade-scene-controls input[type="number"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid var(--slate);
+  background: var(--surface);
+}
+
+.shade-object-list {
+  padding: 0;
+  list-style: none;
+}
+
+.shade-object-list li {
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+}
+
+.shade-object-source {
+  touch-action: none;
+  cursor: grab;
+  border: 1px solid var(--slate);
+}
+
+.shade-object-source:active {
+  cursor: grabbing;
+}
+
+.shade-object-source[aria-pressed="true"] {
+  background: var(--blue-light);
+}
+
+.terrain-page {
+  margin-bottom: 4rem;
+}
+
+.terrain-intro {
+  padding-block-end: 1.25rem;
+  margin-block-end: 1.5rem;
+  border-bottom: 1px solid #ccd7dc;
+}
+
+.terrain-intro p {
+  max-width: 62ch;
+  margin: 0;
+  font-size: 1.125rem;
+  color: #3e5361;
+}
+
+.terrain-page .terrain-photo {
+  max-width: 38rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #ccd7dc;
+  border-radius: 0.75rem;
+  background: #edf3f2;
+}
+
+.terrain-photo h2 {
+  margin-block: 0 0.25rem;
+}
+
+.terrain-page .terrain-field {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+  align-content: start;
+  font-weight: 700;
+}
+
+.terrain-field :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid var(--slate);
+  background: var(--surface);
+}
+
+.terrain-field :is(input, select):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.terrain-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.terrain-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-block: 1rem;
+}
+
+.terrain-actions .button,
+.terrain-page button.button:not(.button-primary) {
+  border: 1px solid var(--slate);
+}
+
+.terrain-capture {
+  display: grid;
+  gap: 1.5rem;
+  margin-block: 1.75rem;
+  justify-items: start;
+}
+
+.terrain-capture > section {
+  width: 100%;
+}
+
+.terrain-passage-settings {
+  display: grid;
+  gap: 0.65rem;
+  width: min(100%, 44rem);
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+}
+
+.terrain-passage-settings legend,
+.terrain-fit-result {
+  font-weight: 700;
+}
+
+.terrain-passage-settings .terrain-field {
+  max-width: 18rem;
+}
+
+.terrain-fit-result {
+  margin-block: 0.5rem;
+}
+
+.terrain-plan {
+  display: block;
+  width: 100%;
+  max-width: 44rem;
+  border: 1px solid var(--line);
+  cursor: crosshair;
+}
+
+.terrain-photo img {
+  display: block;
+  max-width: 100%;
+  max-height: 16rem;
+  margin-block: 0.75rem;
+  object-fit: contain;
+}
+
+.terrain-photo input {
+  max-width: 30rem;
+}
+
+.terrain-capture input {
+  max-width: 22rem;
+}
+
+.terrain-page .shade-scene-controls :is(label, button),
+.terrain-actions .button {
+  max-width: 100%;
+}
+
+.terrain-palette-filter {
+  margin-block: 0.65rem 0.8rem;
+  font-size: 0.875rem;
+}
+
+.terrain-workbench {
+  display: grid;
+  align-items: start;
+  gap: 1rem;
+}
+
+.terrain-workbench > * {
+  min-width: 0;
+}
+
+.terrain-catalog,
+.terrain-stage,
+.terrain-roster {
+  padding: clamp(0.75rem, 2vw, 1.125rem);
+  border: 1px solid #cbd6da;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 2px 5px rgb(35 63 78 / 5%);
+}
+
+.terrain-workbench h3 {
+  margin: 0;
+  color: #1c3542;
+  font-size: 1.15rem;
+}
+
+.terrain-catalog-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  max-height: 16rem;
+  overflow: auto;
+  padding: 0.25rem;
+  scrollbar-color: #849ba7 #edf2f4;
+}
+
+.terrain-catalog-tiles .button.shade-object-source {
+  display: grid;
+  grid-template-rows: 2.75rem minmax(2em, auto) 1em;
+  place-items: center;
+  align-content: start;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.375rem 0.25rem;
+  border: 1px solid #bdcbd2;
+  border-radius: 0.5rem;
+  background: #f5f8f7;
+  color: #183643;
+  font-size: 0.85rem;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+  touch-action: pan-y;
+}
+
+.terrain-catalog-tiles .button.shade-object-source:is(:hover, [aria-pressed="true"]) {
+  border-color: #126478;
+  background: #e3f2f1;
+}
+
+.terrain-catalog-tiles .button.shade-object-source[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px #126478;
+}
+
+.terrain-catalog-tiles canvas {
+  width: 100%;
+  height: 2.75rem;
+  object-fit: contain;
+}
+
+.editor-object-palette {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.65rem;
+  border: 1px solid #cbd6da;
+  border-radius: 0.55rem;
+  background: #f5f8f8;
+}
+
+.editor-object-palette .terrain-catalog-tiles {
+  grid-auto-rows: minmax(6.45rem, auto);
+  align-content: start;
+  max-height: 20.75rem;
+}
+
+.editor-object-location {
+  pointer-events: none;
+  fill: #fff;
+  stroke: #075985;
+  stroke-width: 3;
+}
+
+@media (max-width: 520px) {
+  .editor-object-palette .terrain-catalog-tiles {
+    max-height: 14rem;
+  }
+}
+
+.preview-urban_object {
+  fill: #cc9159;
+  stroke: #653f24;
+  stroke-width: 3;
+}
+
+.preview-urban_object.preview-conflict {
+  stroke: #be123c;
+  stroke-width: 7;
+}
+
+.terrain-catalog-tiles small,
+.terrain-selection span {
+  color: #486170;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.terrain-stage-heading,
+.terrain-stage-footer,
+.terrain-placement-actions,
+.terrain-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.terrain-stage-heading {
+  justify-content: space-between;
+  margin-block-end: 0.75rem;
+}
+
+.terrain-stage-heading .field-help {
+  width: 100%;
+  margin: 0;
+}
+
+.terrain-selection {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: #425b68;
+}
+
+.terrain-selection strong {
+  color: #114c61;
+}
+
+.terrain-stage .shade-scene-figure {
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
+.terrain-stage .terrain-plan-view {
+  background: #eaf0ef;
+  min-height: 9.25rem;
+}
+
+.terrain-stage-footer {
+  justify-content: space-between;
+}
+
+.terrain-stage-footer:not(:has(.terrain-placement-feedback:empty)),
+.terrain-stage-footer:has(button) {
+  margin-block-start: 0.65rem;
+}
+
+.terrain-placement-feedback {
+  margin: 0;
+  color: #165845;
+  font-weight: 700;
+}
+
+.terrain-stage [role="alert"] {
+  padding: 0.65rem 0.85rem;
+  margin: 0.65rem 0 0;
+  border-left: 3px solid #ae4b19;
+  background: #fff4e9;
+  color: #773814;
+}
+
+.terrain-roster h3 span {
+  margin-inline-start: 0.35rem;
+  color: #486170;
+  font-weight: 400;
+}
+
+.terrain-roster .shade-object-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 0.65rem;
+  margin: 0.65rem 0 0;
+}
+
+.terrain-roster .shade-object-list:empty {
+  margin: 0;
+}
+
+.terrain-roster .shade-object-list li {
+  align-items: end;
+  border-radius: 0.5rem;
+  margin: 0;
+  gap: 0.5rem;
+}
+
+.terrain-roster li strong {
+  width: 100%;
+  align-self: start;
+}
+
+.terrain-roster li label {
+  flex: 1 1 4.8rem;
+}
+
+@media (max-width: 520px) {
+  .terrain-roster .shade-object-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) repeat(2, minmax(0, 1fr));
+  }
+
+  .terrain-roster li strong {
+    grid-column: 1 / -1;
+  }
+
+  .terrain-roster li .button {
+    padding-inline: 0.45rem;
+  }
+}
+
+.terrain-view-switch .button {
+  border-radius: 0.5rem;
+}
+
+.terrain-view-switch .button[aria-pressed="true"] {
+  border-color: #0c5264;
+  background: #115565;
+  color: #fff;
+}
+
+@media (min-width: 800px) {
+  .terrain-workbench:not(.terrain-workbench-preview) {
+    grid-template-columns: 18rem minmax(0, 1fr);
+  }
+
+  .terrain-roster {
+    grid-column: 1 / -1;
+  }
+
+  .terrain-catalog-tiles {
+    max-height: 28rem;
+  }
+}
+
+.terrain-context {
+  margin-block: 0.75rem;
+}
+
+.terrain-capture h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.terrain-page .shade-scene {
+  max-height: 32rem;
+}
+
+.terrain-settings {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+}
+
+.terrain-settings > summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.5rem 0;
+}
+
+.terrain-settings > section {
+  margin-top: 1.25rem;
+}
+
+.terrain-perspective-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.terrain-perspective-controls > .terrain-actions {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.terrain-perspective-controls > .terrain-field {
+  min-width: 0;
+}
+
+.editor-preview-actions {
+  margin: 0.65rem 1rem;
+}
+
+@media (max-width: 520px) {
+  .terrain-perspective-controls > .terrain-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .terrain-perspective-controls .button {
+    min-height: 44px;
+    padding: 0.4rem;
+    line-height: 1.2;
+  }
+
+  .editor-preview-actions .button,
+  .editor-workspace .editor-toolbar .button {
+    width: auto;
+    padding-inline: 0.65rem;
+  }
+}
+
+.terrain-perspective-controls input[type="range"] {
+  padding: 0;
+  border: 0;
+  accent-color: var(--blue);
+}
+
+.terrain-perspective-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 36rem;
+  object-fit: contain;
+  background: #edf3f4;
+}
+
+.terrain-perspective-canvas[hidden] {
+  display: none;
+}
+
+.terrain-perspective-stage {
+  background: #edf3f4;
+}
+
+.terrain-perspective-viewport {
+  position: relative;
+  max-width: calc(36rem * 52 / 31);
+  margin-inline: auto;
+  overflow: clip;
+}
+
+.terrain-overview-marker {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.35rem;
+  transform: translate(-50%, calc(-100% - 5px));
+  border: 2px solid white;
+  border-radius: 999px;
+  background: #075065;
+  color: white;
+  box-shadow: 0 2px 5px #0f172a55;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.terrain-overview-marker::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #075065;
+  content: "";
+}
+
+.terrain-overview-marker:hover {
+  z-index: 1;
+  background: #0c3546;
+}
+
+.terrain-selection,
+.terrain-marker-choices {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--blue-light);
+  color: var(--ink);
+}
+
+.terrain-selection {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.terrain-marker-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem 0.75rem;
+}
+
+.terrain-marker-choices .terrain-field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.terrain-view-button[aria-pressed="true"] {
+  background: var(--blue-light);
+}
+
+.terrain-orbit-help {
+  padding: 0.5rem 1rem 0;
+}
+
+.terrain-perspective-canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+.terrain-perspective-canvas:active {
+  cursor: grabbing;
+}
+
+.terrain-perspective-canvas:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.terrain-photo-preview-controls {
+  padding: 0.65rem 1rem;
+  margin: 0;
+}
+
+.terrain-photo-frame {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 34rem;
+  object-fit: contain;
+  background: #151c22;
+}
+
+.terrain-photo-frame[hidden] {
+  display: none;
+}
+
+.terrain-photo-preview .field-help {
+  padding-inline: 1rem;
 }

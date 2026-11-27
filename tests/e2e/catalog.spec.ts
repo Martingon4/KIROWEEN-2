@@ -52,6 +52,7 @@ test("loads the local MapLibre enhancement with keyboard focus", async ({
   await expect(page.locator("[data-map-state]")).toHaveAttribute(
     "data-map-state",
     "ready",
+    { timeout: 15_000 },
   );
   const map = page.getByRole("region", {
     name: /dos intervenciones hipotéticas/i,

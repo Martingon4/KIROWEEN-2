@@ -1,5 +1,25 @@
 # Kiro development evidence
 
+## Verificación local de los cambios con el editor 3D
+
+En una copia con Supabase recién reiniciado, `CI=1 npm run check:ci` terminó con código 0 en Node v24.22.3. Pasaron 507 pruebas unitarias y 2851 pgTAP. De los 180 casos de Playwright en escritorio y a 360 px, 174 aprobaron al primer intento, 3 tras reintento y 3 se omitieron. La omisión móvil del límite de uso es intencional y los otros dos casos requieren el modelo opcional de relieve. [Comandos y resultados por corrida](progress.md#validación-aislada-de-los-cambios-locales).
+
+Con los tiempos de espera ajustados, se repitieron los casos de carga de MapLibre y accesibilidad de fusión dos veces por tamaño. Pasaron los ocho casos con tres trabajadores y sin reintentos.
+
+## Capturas de entrega
+
+Playwright recorrió un caso hipotético con cuentas de demostración en el entorno local aislado. Detectó un solapamiento de 174,67 m² entre la cubierta y el mercado, guardó la fusión tras redibujar el mercado, bloqueó el cierre del expediente sin evidencia nueva y comprobó la respuesta del exportador HTML. Las 14 capturas registraron 0 px de desbordamiento horizontal.
+
+| Vista | 1440 px | 390 px |
+|---|---|---|
+| Ramas | [Escritorio](kiro-evidence/delivery-branches-1440.png) | [Móvil](kiro-evidence/delivery-branches-390.png) |
+| Editor | [Escritorio](kiro-evidence/delivery-editor-1440.png) | [Móvil](kiro-evidence/delivery-editor-390.png) |
+| Comparación | [Escritorio](kiro-evidence/delivery-compare-1440.png) | [Móvil](kiro-evidence/delivery-compare-390.png) |
+| Fusión | [Escritorio](kiro-evidence/delivery-merge-1440.png) | [Móvil](kiro-evidence/delivery-merge-390.png) |
+| Expediente | [Escritorio](kiro-evidence/delivery-dossier-1440.png) | [Móvil](kiro-evidence/delivery-dossier-390.png) |
+| Gestión y bloqueo del cierre | [Escritorio](kiro-evidence/delivery-dossier-manage-1440.png) | [Móvil](kiro-evidence/delivery-dossier-manage-390.png) |
+| Moderación | [Escritorio](kiro-evidence/delivery-moderation-1440.png) | [Móvil](kiro-evidence/delivery-moderation-390.png) |
+
 | Requirement | Kiro artifact or capability                      | Result and path                                                                                                                                 |
 | ----------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | FT-01       | Master-plan analysis and Requirements-First Spec | Pilot source selected with explicit partial coverage in `docs/validation.md`; requirements in `.kiro/specs/01-foundation-place/requirements.md` |

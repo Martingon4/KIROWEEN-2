@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
@@ -13,6 +13,59 @@ import {
   signIn,
 } from "./helpers";
 
+test("bloquea un árbol dentro del mercado y permite moverlo fuera", async ({
+  page,
+}) => {
+  await signIn(page);
+  const { branchId } = await createBranch(page, "Editor ocupación");
+  await openEditor(page, branchId);
+  const kind = page.getByLabel("Tipo de intervención");
+  const add = page.getByRole("button", { name: "Agregar a la rama" });
+  await kind.selectOption({ label: "Mercado temporal" });
+  await (
+    await revealCoordinates(page)
+  ).fill(
+    "-98.19820, 19.04360\n-98.19800, 19.04360\n-98.19800, 19.04370\n-98.19820, 19.04370",
+  );
+  await add.click();
+  await expect(featureList(page)).toContainText("Mercado temporal");
+
+  await kind.selectOption({ label: "Árbol de sombra" });
+  await (await revealCoordinates(page)).fill("-98.19815, 19.04365");
+  await add.click();
+  await expect(page.getByText(/El tronco del árbol coincide/)).toBeVisible();
+  await expect(featureList(page).locator("li")).toHaveCount(1);
+
+  await (await revealCoordinates(page)).fill("-98.19775, 19.04360");
+  await add.click();
+  await expect(featureList(page)).toContainText("Árbol de sombra");
+  await page
+    .getByLabel("Describe el cambio")
+    .fill("Separar el tronco y el mercado");
+  await page.getByRole("button", { name: "Guardar revisión" }).click();
+  await expect(page.getByText(/Revisión guardada\. Ahora es/)).toBeVisible();
+  const head = (await api(page, `/api/v1/branches/${branchId}`)).body!.data;
+  const bypass = await api(page, `/api/v1/branches/${branchId}/revisions`, {
+    method: "POST",
+    key: randomUUID(),
+    body: {
+      message: "Intento desde la API",
+      expectedHeadId: head.revisionId,
+      features: head.features.map(
+        (feature: { kind: string; geometry: unknown }) =>
+          feature.kind === "shade_tree"
+            ? {
+                ...feature,
+                geometry: { type: "Point", coordinates: [-98.19815, 19.04365] },
+              }
+            : feature,
+      ),
+    },
+  });
+  expect(bypass.status).toBe(422);
+  expect(bypass.body?.code).toBe("market_tree_overlap");
+});
+
 test("guarda una revisión desde el formulario y la conserva al recargar", async ({
   page,
 }) => {
@@ -20,19 +73,232 @@ test("guarda una revisión desde el formulario y la conserva al recargar", async
   const { branchId } = await createBranch(page, "Editor guardar");
   await openEditor(page, branchId);
 
-  await addDefaultCanopy(page);
+  const coordinates = page.locator("details.coordinates-details");
+  const draft = page.locator("svg.editor-preview polygon.preview-draft");
+  const initialFootprint = await draft.getAttribute("points");
+  const place = page.getByRole("button", { name: "Agregar a la rama" });
+  await place.press("Shift+ArrowRight");
+  await expect(draft).not.toHaveAttribute("points", initialFootprint!);
+  await place.press("Enter");
+  await expect(coordinates).toHaveJSProperty("open", false);
   await expect(
     page.getByText("Cambios sin guardar en este dispositivo"),
   ).toBeVisible();
 
+  await page
+    .getByRole("link", { name: /guarda los cambios de la rama/ })
+    .click();
+  await expect(page).toHaveURL(/#editor-message$/);
   await page.getByLabel("Describe el cambio").fill("Agrego cubierta de sombra");
   await page.getByRole("button", { name: "Guardar revisión" }).click();
   await expect(page.getByText(/Revisión guardada\. Ahora es/)).toBeVisible();
   await expect(page.getByText("Sin cambios pendientes")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /publica la revisión guardada/ }),
+  ).toBeVisible();
 
   await page.reload();
   await expect(featureList(page)).toContainText("Cubierta de sombra");
   await expect(page.getByText("Sin cambios pendientes")).toBeVisible();
+});
+
+test("coloca mobiliario en una rama, lo guarda y lo conserva al publicar y bifurcar", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await signIn(page);
+  const { branchId } = await createBranch(page, "Mobiliario del Zócalo");
+  await openEditor(page, branchId);
+  await page.getByRole("button", { name: "Colocar objetos" }).click();
+  await expect(page.getByLabel("Tipo de intervención")).toHaveValue("bench");
+  await page.getByRole("button", { name: "Banca", exact: true }).click();
+  const plan = page.getByRole("img", { name: /Vista previa esquemática/ });
+  await plan.click();
+  const add = page.getByRole("button", { name: "Agregar a la rama" });
+  await add.click();
+  await expect(featureList(page)).toContainText("Banca");
+  await plan.click();
+  await add.click();
+  await expect(page.getByText(/Ese espacio ya está ocupado/)).toBeVisible();
+  await expect(featureList(page).locator("li")).toHaveCount(1);
+
+  await page.getByLabel("Objetos por categoría").selectOption("access");
+  await expect(page.getByRole("button", { name: "Rampa" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await add.press("Shift+ArrowRight");
+  await add.press("Enter");
+  await expect(featureList(page)).toContainText("Rampa");
+  await page
+    .getByLabel("Describe el cambio")
+    .fill("Coloco mobiliario hipotético");
+  await page.getByRole("button", { name: "Guardar revisión" }).click();
+  await expect(page.getByText(/Revisión guardada\. Ahora es/)).toBeVisible();
+  await page.reload();
+  await expect(featureList(page).locator("li")).toHaveCount(2);
+  await page.getByRole("button", { name: "Vista previa 3D" }).click();
+  const scene = page.locator("canvas.terrain-perspective-canvas");
+  await expect(scene).toHaveAttribute("data-detail-models", /bench/, {
+    timeout: 45000,
+  });
+  await expect(
+    page.getByRole("button", { name: "Enfocar modelos" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBe(0);
+
+  const head = (await api(page, `/api/v1/branches/${branchId}`)).body!.data;
+  expect(
+    head.features
+      .map(
+        (feature: { properties: { objectType: string } }) =>
+          feature.properties.objectType,
+      )
+      .sort(),
+  ).toEqual(["bench", "ramp"]);
+  const existing = head.features[0];
+  const collision = await api(page, `/api/v1/branches/${branchId}/revisions`, {
+    method: "POST",
+    key: randomUUID(),
+    body: {
+      message: "Intento solapar objetos",
+      expectedHeadId: head.revisionId,
+      features: [...head.features, { ...existing, id: randomUUID() }],
+    },
+  });
+  expect(collision.status).toBe(422);
+  expect(collision.body?.code).toBe("urban_object_overlap");
+
+  await page
+    .locator("#publish-summary")
+    .fill("Banca y rampa en una propuesta hipotética.");
+  await page.locator("#publish-consent").check();
+  await page
+    .getByRole("form", { name: "Publicar revisión" })
+    .getByRole("button", { name: "Publicar revisión" })
+    .click();
+  const link = page
+    .locator(".editor-status")
+    .getByRole("link", { name: "Abrir enlace público" });
+  await expect(link).toBeVisible();
+  const href = (await link.getAttribute("href"))!;
+  const publicationId = href.split("/").pop();
+  await page.goto(href);
+  await expect(page.locator(".publication-features")).toContainText("Rampa");
+  const comparison = await api(
+    page,
+    `/api/v1/compare?left=baseline:${head.baselineId}&right=publication:${publicationId}`,
+  );
+  expect(comparison.status).toBe(200);
+  expect(comparison.body?.data.right.cost).toMatchObject({
+    partial: true,
+    lines: [{ concept: "urban_object", quantity: 2, status: "unpriced" }],
+  });
+  await page.getByRole("button", { name: "Crear mi copia privada" }).click();
+  await expect(page).toHaveURL(/\/es\/branches\/[^/]+$/);
+  await expect(featureList(page).locator("li")).toHaveCount(2);
+  await page.goto(new URL(page.url()).pathname.replace("/es/", "/en/"));
+  await expect(
+    page.getByRole("button", { name: "Place objects" }),
+  ).toBeVisible();
+  await expect(featureList(page)).toContainText("Ramp");
+});
+
+test("elige modelos individuales en Tipo de intervención y los dibuja sin cerrar el 3D", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await signIn(page);
+  const { branchId } = await createBranch(
+    page,
+    "Diseño desde el menú de la rama",
+  );
+  await openEditor(page, branchId);
+  const selector = page.getByLabel("Tipo de intervención");
+  await expect(selector.locator("option")).toHaveCount(13);
+  await expect(selector.locator("optgroup")).toHaveCount(4);
+  await expect(selector.locator("optgroup option")).toHaveCount(9);
+  await expect(
+    selector.locator('optgroup[label="Actividad y recreación"] option'),
+  ).toContainText(["Puesto de mercado", "Fuente", "Escenario"]);
+
+  const preview = page.getByRole("button", { name: "Vista previa 3D" });
+  await preview.click();
+  const canvas = page.locator("canvas.terrain-perspective-canvas");
+  await expect(canvas).toHaveAttribute("data-detail-models", /bench/, {
+    timeout: 45000,
+  });
+  await expect(canvas).toHaveAttribute("data-context-buildings", /^[1-9]/);
+  const pixels = async () =>
+    createHash("sha256")
+      .update(
+        await canvas.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .digest("hex");
+  const empty = await pixels();
+  await selector.selectOption({ label: "Escenario" });
+  await expect(page.getByLabel("Nombre visible")).toHaveValue("Escenario");
+  const add = page.getByRole("button", { name: "Agregar a la rama" });
+  await add.click();
+  await expect(featureList(page)).toContainText("Escenario");
+  await expect(preview).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(pixels, { timeout: 15000 }).not.toBe(empty);
+  const withStage = await pixels();
+
+  await selector.selectOption({ label: "Banca" });
+  for (let i = 0; i < 4; i++) await add.press("Shift+ArrowRight");
+  await add.press("Enter");
+  await expect(featureList(page).locator("li")).toHaveCount(2);
+  await expect.poll(pixels, { timeout: 15000 }).not.toBe(withStage);
+  const overview = await pixels();
+  const focus = page.getByLabel("Objeto a enfocar");
+  await expect(focus.locator("option")).toHaveText([
+    "Vista general",
+    "1. Escenario",
+    "2. Banca",
+  ]);
+  await expect(focus).toHaveValue("");
+  await expect(page.locator(".terrain-overview-marker").first()).toBeVisible();
+  const benchMarker = page.getByRole("button", { name: "Enfocar Banca" });
+  if (await benchMarker.count()) {
+    await benchMarker.click();
+  } else {
+    await page.getByRole("button", { name: "2 objetos cercanos" }).click();
+    const group = page.getByLabel("Objetos del grupo");
+    await expect(group).toBeFocused();
+    await group.selectOption({ label: "Banca" });
+  }
+  await expect(focus.locator("option:checked")).toHaveText("2. Banca");
+  await expect(page.locator(".terrain-selection")).toHaveText("Banca");
+  await page.getByRole("button", { name: "Ver todo el terreno" }).click();
+  await page.getByRole("button", { name: "Enfocar modelos" }).click();
+  await expect.poll(pixels, { timeout: 15000 }).not.toBe(overview);
+  const stageDetail = await pixels();
+  await focus.selectOption({ label: "2. Banca" });
+  await expect.poll(pixels, { timeout: 15000 }).not.toBe(stageDetail);
+  await page.getByRole("button", { name: "Ver todo el terreno" }).click();
+  await expect.poll(pixels, { timeout: 15000 }).toBe(overview);
+  await expect(focus).toHaveValue("");
+  await page.getByRole("button", { name: "Ver en 3D · Banca" }).click();
+  await expect(focus.locator("option:checked")).toHaveText("2. Banca");
+  await expect(
+    page.getByRole("heading", { name: "Vista previa esquemática" }),
+  ).toBeFocused();
+  await page
+    .getByRole("button", { name: "Elegir ubicación en el plano" })
+    .click();
+  await expect(page.locator(".editor-object-location")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBe(0);
 });
 
 test("deshace y rehace desde la interfaz", async ({ page }) => {
@@ -47,6 +313,102 @@ test("deshace y rehace desde la interfaz", async ({ page }) => {
 
   await page.getByRole("button", { name: "Rehacer" }).click();
   await expect(featureList(page)).toContainText("Cubierta de sombra");
+});
+
+test("muestra la intervención en 3D al agregarla y al deshacer", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await signIn(page);
+  const { branchId } = await createBranch(page, "Editor vista 3D");
+  await openEditor(page, branchId);
+
+  const button = page.getByRole("button", { name: "Vista previa 3D" });
+  await button.click();
+  const scene = page.getByRole("img", {
+    name: "Vista 3D con las intervenciones de esta rama",
+  });
+  const pixels = async () =>
+    createHash("sha256")
+      .update(
+        await scene.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .digest("hex");
+  await expect(scene).toBeVisible();
+  await expect(scene).toHaveAttribute("data-detail-models", /bench/, {
+    timeout: 45000,
+  });
+  const empty = await pixels();
+
+  await addDefaultCanopy(page);
+  await expect.poll(pixels).not.toBe(empty);
+  await page.getByRole("button", { name: "Deshacer" }).click();
+  await expect.poll(pixels).toBe(empty);
+  await scene.press("ArrowRight");
+  await expect.poll(pixels).not.toBe(empty);
+  await button.click();
+  await expect(
+    page.getByRole("img", { name: /Vista previa esquemática/ }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBe(0);
+});
+
+test("dibuja diez puestos con el modelo GLB y permite pausar el giro", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await signIn(page);
+  const { branchId } = await createBranch(page, "Mercado con modelos 3D");
+  await openEditor(page, branchId);
+  await page
+    .getByLabel("Tipo de intervención")
+    .selectOption({ label: "Mercado temporal" });
+  await page.locator("#editor-stallCount").fill("10");
+  await page.locator("#editor-moduleM2").fill("6");
+  await (
+    await revealCoordinates(page)
+  ).fill(
+    "-98.19820, 19.04360\n-98.19800, 19.04360\n-98.19800, 19.04370\n-98.19820, 19.04370",
+  );
+  await page.getByRole("button", { name: "Agregar a la rama" }).click();
+  await page.getByRole("button", { name: "Vista previa 3D" }).click();
+  const canvas = page.locator("canvas.terrain-perspective-canvas");
+  await expect(canvas).toHaveAttribute("data-detail-models", /stall/, {
+    timeout: 45000,
+  });
+  await expect(
+    page.getByText(/Puestos dibujados a escala: 10 de 10/),
+  ).toBeVisible();
+  const pixels = async () =>
+    createHash("sha256")
+      .update(
+        await canvas.evaluate((node) =>
+          (node as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .digest("hex");
+  const wide = await pixels();
+  await page.getByRole("button", { name: "Enfocar modelos" }).click();
+  await expect.poll(pixels).not.toBe(wide);
+  const still = await pixels();
+  await page.getByRole("button", { name: "Girar en automático" }).click();
+  await expect.poll(pixels, { timeout: 15000 }).not.toBe(still);
+  await page.getByRole("button", { name: "Pausar giro" }).click();
+  const stopped = await pixels();
+  await expect
+    .poll(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return pixels();
+    })
+    .toBe(stopped);
+  await page.getByRole("button", { name: "Ver todo el terreno" }).click();
+  await expect.poll(pixels).not.toBe(stopped);
 });
 
 test("recupera un borrador local tras recargar", async ({ page }) => {
@@ -156,7 +518,7 @@ test("el editor no tiene hallazgos graves de accesibilidad ni desbordamiento", a
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test("la lista de ramas enlaza al editor de cada rama", async ({ page }) => {
+test("la lista de ramas enlaza al editor y al simulador con foto", async ({ page }) => {
   await signIn(page);
   const { branchId, title } = await createBranch(page, "Editor enlace");
   await page.goto("/es/branches");
@@ -166,6 +528,17 @@ test("la lista de ramas enlaza al editor de cada rama", async ({ page }) => {
   await expect(link).toBeVisible();
   await link.click();
   await expect(page).toHaveURL(new RegExp(`/es/branches/${branchId}$`));
+
+  await page.goto("/es/branches");
+  const simulator = page.getByRole("link", { name: "Diseñar en mi terreno" });
+  await expect(simulator).toBeVisible();
+  await simulator.press("Enter");
+  await expect(page).toHaveURL(/\/es\/terrain$/);
+  await expect(page.getByLabel("Elegir foto")).toBeVisible();
+
+  await page.goto("/en/branches");
+  await page.getByRole("link", { name: "Design on my land" }).click();
+  await expect(page).toHaveURL(/\/en\/terrain$/);
 });
 
 test("el primer Tab del editor enfoca el enlace de salto visible", async ({

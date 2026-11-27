@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 const SITE_ID = "8f5a6417-5f6d-4f02-a50c-76d97167db99";
@@ -7,6 +8,17 @@ const SITE_ID = "8f5a6417-5f6d-4f02-a50c-76d97167db99";
 export type ApiResult = { status: number; body: Record<string, any> | null };
 
 export type TestAccount = "participant" | "coordinator" | "moderator";
+
+export function localSupabaseDbContainer(): string {
+  const config = readFileSync("supabase/config.toml", "utf8");
+  const projectId = /^\s*project_id\s*=\s*"([\w-]+)"/m.exec(config)?.[1];
+  if (!projectId) {
+    throw new Error(
+      "Falta el identificador del Supabase local en supabase/config.toml.",
+    );
+  }
+  return `supabase_db_${projectId}`;
+}
 
 const accountVariables: Record<TestAccount, [string, string]> = {
   participant: ["FTC_PARTICIPANT_EMAIL", "FTC_PARTICIPANT_PASSWORD"],

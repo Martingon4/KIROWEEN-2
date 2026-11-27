@@ -9,6 +9,7 @@ import type { Intervention } from "@/lib/schemas/intervention";
 const ID = "44444444-4444-4444-8444-444444444444";
 const number = new Intl.NumberFormat("es", { maximumFractionDigits: 2 });
 const templates: SummaryTemplates = {
+  urban_object: "{width} × {depth} · altura {height}",
   shade_tree: "Copa {canopy} · altura {height}",
   shade_canopy: "Altura {height}",
   temporary_market: "{stalls} puestos de {module} · {timeSlot}",

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { InteractiveMap } from "@/features/places/interactive-map";
 import type { PublicSite } from "@/features/places/site-data";
 import type { Locale } from "@/lib/i18n/locales";
-import { projectPolygonFeatures } from "@/lib/geo/project";
+import { projectGeometry, projectPolygonFeatures } from "@/lib/geo/project";
 import type esMessages from "@/messages/es.json";
 
 type Messages = typeof esMessages;
@@ -22,8 +22,9 @@ function ForkMark() {
 }
 
 function PlaceSchematic({ messages, site }: Omit<PlaceCatalogProps, "locale">) {
-  const reference = projectPolygonFeatures(site.baseline, site.bounds);
-  const scenarios = projectPolygonFeatures(site.scenario, site.bounds);
+  const bounds = site.osmContext.bbox;
+  const reference = projectPolygonFeatures(site.baseline, bounds);
+  const scenarios = projectPolygonFeatures(site.scenario, bounds);
 
   return (
     <figure className="place-schematic" aria-labelledby="place-map-title">
@@ -39,7 +40,7 @@ function PlaceSchematic({ messages, site }: Omit<PlaceCatalogProps, "locale">) {
       <InteractiveMap
         ariaLabel={messages.map.aria}
         baseline={site.baseline}
-        bounds={site.bounds}
+        osmContext={site.osmContext}
         readyLabel={messages.map.interactiveReady}
         scenario={site.scenario}
         fallback={
@@ -94,6 +95,20 @@ function PlaceSchematic({ messages, site }: Omit<PlaceCatalogProps, "locale">) {
                 points={feature.svgPoints}
               />
             ))}
+            <g aria-hidden="true">
+              {site.osmContext.features.map((feature) => {
+                const shape = projectGeometry(feature.geometry, bounds);
+                if (shape.shape === "point") {
+                  return <circle key={feature.id} cx={shape.cx} cy={shape.cy} r="3" fill="#475569" />;
+                }
+                if (shape.shape === "line") {
+                  return <polyline key={feature.id} points={shape.points} fill="none"
+                    stroke="#64748b" strokeWidth="2"
+                    strokeDasharray={feature.properties.kind === "street" ? undefined : "5 4"} />;
+                }
+                return <polygon key={feature.id} points={shape.points} fill="#c7beb2" stroke="#989188" />;
+              })}
+            </g>
             {scenarios.map((feature) => (
               <polygon
                 key={feature.id}
@@ -119,6 +134,7 @@ function PlaceSchematic({ messages, site }: Omit<PlaceCatalogProps, "locale">) {
           <i className="legend-line reference" />
           {messages.map.reference}
         </span>
+        <span>{messages.map.osmContext}</span>
         <span>
           <i className="legend-line shade" />
           {messages.map.shade}

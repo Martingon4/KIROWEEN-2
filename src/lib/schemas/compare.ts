@@ -125,3 +125,22 @@ export const compareResultSchema = z.object({
 
 export type CompareResult = z.infer<typeof compareResultSchema>;
 export type CompareChange = CompareResult["features"][number];
+
+export const comparePageResultSchema = compareResultSchema.extend({
+  spatialOverlaps: z.object({
+    count: z.number().int().nonnegative(),
+    examples: z.array(
+      z.object({
+        leftLabel: z.string(),
+        rightLabel: z.string(),
+        intersectionM2: z.number().nonnegative().nullable(),
+      }),
+    ).max(3),
+  }),
+  scenario: compareResultSchema.shape.scenario.extend({
+    azimuthRad: z.number(),
+    elevationRad: z.number().positive(),
+  }),
+});
+
+export type ComparePageResult = z.infer<typeof comparePageResultSchema>;

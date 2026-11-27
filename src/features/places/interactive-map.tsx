@@ -7,7 +7,7 @@ import type { PublicSite } from "@/features/places/site-data";
 type InteractiveMapProps = {
   ariaLabel: string;
   baseline: PublicSite["baseline"];
-  bounds: PublicSite["bounds"];
+  osmContext: PublicSite["osmContext"];
   fallback: ReactNode;
   readyLabel: string;
   scenario: PublicSite["scenario"];
@@ -18,7 +18,7 @@ type MapState = "loading" | "ready" | "fallback";
 export function InteractiveMap({
   ariaLabel,
   baseline,
-  bounds,
+  osmContext,
   fallback,
   readyLabel,
   scenario,
@@ -43,13 +43,17 @@ export function InteractiveMap({
         const maplibregl = await import("maplibre-gl");
         if (disposed || !container.current) return;
         maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
-        const [west, south, east, north] = bounds;
+        const [west, south, east, north] = osmContext.bbox;
 
         map = new maplibregl.Map({
           container: container.current,
           style: {
             version: 8,
             sources: {
+              streets: {
+                type: "geojson",
+                data: osmContext as unknown as FeatureCollection,
+              },
               baseline: {
                 type: "geojson",
                 data: baseline as unknown as FeatureCollection,
@@ -80,6 +84,34 @@ export function InteractiveMap({
                   "line-width": 4,
                   "line-dasharray": [3, 2],
                 },
+              },
+              {
+                id: "reference-buildings",
+                type: "fill",
+                source: "streets",
+                filter: ["==", ["get", "kind"], "building"],
+                paint: { "fill-color": "#c7beb2", "fill-outline-color": "#989188" },
+              },
+              {
+                id: "reference-streets",
+                type: "line",
+                source: "streets",
+                filter: ["==", ["get", "kind"], "street"],
+                paint: { "line-color": "#64748b", "line-width": 2.3 },
+              },
+              {
+                id: "reference-paths",
+                type: "line",
+                source: "streets",
+                filter: ["in", ["get", "kind"], ["literal", ["path", "crossing"]]],
+                paint: { "line-color": "#64748b", "line-width": 1.5, "line-dasharray": [2, 2] },
+              },
+              {
+                id: "reference-crossings",
+                type: "circle",
+                source: "streets",
+                filter: ["==", ["geometry-type"], "Point"],
+                paint: { "circle-color": "#475569", "circle-radius": 3 },
               },
               {
                 id: "shade-fill",
@@ -144,7 +176,7 @@ export function InteractiveMap({
       disposed = true;
       map?.remove();
     };
-  }, [baseline, bounds, scenario]);
+  }, [baseline, osmContext, scenario]);
 
   return (
     <div className="map-stage" data-map-state={state}>

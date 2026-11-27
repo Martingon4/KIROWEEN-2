@@ -1,10 +1,12 @@
 import {
   projectGeometry,
+  projectPosition,
   unprojectPosition,
   type BoundingBox,
   type DrawableGeometry,
 } from "@/lib/geo/project";
 import type { Intervention } from "@/lib/schemas/intervention";
+import { urbanObjectCenter } from "@/lib/geo/urban-object";
 
 type RevisionPreviewProps = {
   ariaLabel: string;
@@ -12,11 +14,27 @@ type RevisionPreviewProps = {
   bounds: BoundingBox;
   features: readonly Intervention[];
   selectedId?: string;
+  conflictingIds?: ReadonlySet<string>;
   /** Pointer shortcut: receives the clicked [longitude, latitude]. The form stays the way in for keyboards. */
   onPick?: (longitude: number, latitude: number) => void;
   /** The shape being edited in the form, drawn dashed before it is added. */
   draft?: DrawableGeometry | null;
+  markDraftCenter?: boolean;
 };
+
+export function revisionPositionAt(
+  svg: SVGSVGElement,
+  bounds: BoundingBox,
+  x: number,
+  y: number,
+) {
+  const transform = svg.getScreenCTM();
+  if (!transform) return null;
+  const point = new DOMPoint(x, y).matrixTransform(transform.inverse());
+  if (point.x < 0 || point.x > 1000 || point.y < 0 || point.y > 700)
+    return null;
+  return unprojectPosition([point.x, point.y], bounds);
+}
 
 /** Schematic SVG of a snapshot. No hooks, so it renders on the server or the client. */
 export function RevisionPreview({
@@ -25,11 +43,17 @@ export function RevisionPreview({
   bounds,
   features,
   selectedId,
+  conflictingIds,
   onPick,
   draft,
+  markDraftCenter = false,
 }: RevisionPreviewProps) {
   const boundaryShape = projectGeometry(boundary, bounds);
   const draftShape = draft ? projectGeometry(draft, bounds) : null;
+  const draftCenter =
+    markDraftCenter && draft?.type === "Polygon"
+      ? projectPosition(urbanObjectCenter(draft.coordinates[0]), bounds)
+      : null;
   return (
     <svg
       className={
@@ -41,16 +65,13 @@ export function RevisionPreview({
       onClick={
         onPick
           ? (event) => {
-              const box = event.currentTarget.getBoundingClientRect();
-              if (box.width === 0 || box.height === 0) return;
-              const [longitude, latitude] = unprojectPosition(
-                [
-                  ((event.clientX - box.left) / box.width) * 1000,
-                  ((event.clientY - box.top) / box.height) * 700,
-                ],
+              const point = revisionPositionAt(
+                event.currentTarget,
                 bounds,
+                event.clientX,
+                event.clientY,
               );
-              onPick(longitude, latitude);
+              if (point) onPick(...point);
             }
           : undefined
       }
@@ -60,7 +81,7 @@ export function RevisionPreview({
       ) : null}
       {features.map((feature) => {
         const shape = projectGeometry(feature.geometry, bounds);
-        const className = `preview-${feature.kind}${feature.id === selectedId ? " preview-selected" : ""}`;
+        const className = `preview-${feature.kind}${feature.id === selectedId ? " preview-selected" : ""}${conflictingIds?.has(feature.id) ? " preview-conflict" : ""}`;
         if (shape.shape === "point") {
           return (
             <circle
@@ -99,6 +120,14 @@ export function RevisionPreview({
       ) : draftShape ? (
         <polygon className="preview-draft" points={draftShape.points} />
       ) : null}
+      {draftCenter && (
+        <circle
+          className="editor-object-location"
+          cx={draftCenter[0]}
+          cy={draftCenter[1]}
+          r="7"
+        />
+      )}
     </svg>
   );
 }

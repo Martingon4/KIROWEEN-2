@@ -15,13 +15,13 @@ import {
   addDefaultCanopy,
   api,
   createBranch,
+  localSupabaseDbContainer,
   openEditor,
   signIn,
   type ApiResult,
   type TestAccount,
 } from "./helpers";
 
-const DB_CONTAINER = "supabase_db_KIROWEEN-2";
 const PAST_DATE = "2025-03-10";
 
 /**
@@ -45,7 +45,7 @@ function clearRateWindows(accounts: TestAccount[]) {
       [
         "exec",
         "-i",
-        DB_CONTAINER,
+        localSupabaseDbContainer(),
         "psql",
         "-U",
         "postgres",

@@ -1,8 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { parseCoordinates, placeAtPoint } from "@/features/editor/coordinates";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
+import {
+  coordinateCenter,
+  parseCoordinates,
+  placeAtPoint,
+} from "@/features/editor/coordinates";
 import {
   createDefaultIntervention,
   geometryTypeForKind,
@@ -27,7 +37,7 @@ import {
 } from "@/features/editor/editor-state";
 import {
   fromFormValues,
-  numericFields,
+  numericFieldsFor,
   toFormValues,
   type FieldErrors,
   type FormField,
@@ -39,9 +49,20 @@ import {
   sameSnapshot,
 } from "@/lib/geo/canonical";
 import type { BoundingBox, DrawableGeometry } from "@/lib/geo/project";
+import { footprintFitsSurface, ringCoversPoint } from "@/lib/geo/planar";
+import {
+  urbanObjectFootprint,
+  urbanObjectsOverlap,
+} from "@/lib/geo/urban-object";
 import { describeIntervention, fillTemplate } from "@/features/editor/describe";
-import { RevisionPreview } from "@/features/versions/revision-preview";
+import {
+  RevisionPreview,
+  revisionPositionAt,
+} from "@/features/versions/revision-preview";
+import { TerrainObjectThumbnail } from "@/features/terrain/terrain-object-thumbnail";
+import { InterventionPerspective } from "./intervention-perspective";
 import type { Locale } from "@/lib/i18n/locales";
+import type { OsmContext } from "@/features/places/site-data";
 import {
   editableKinds,
   saveRevisionResponseSchema,
@@ -55,8 +76,21 @@ import {
   publishRevisionResponseSchema,
 } from "@/lib/schemas/publication";
 import type esMessages from "@/messages/es.json";
+import {
+  terrainObjects,
+  type RevisionObjectKind,
+} from "@/lib/schemas/terrain-objects";
 
 type EditorMessages = (typeof esMessages)["editor"];
+type PaletteGroup = Exclude<keyof typeof esMessages.terrain.placement.groups, "construction">;
+const branchObjectGroups: Record<PaletteGroup, RevisionObjectKind[]> = {
+  shade: ["parasol"],
+  furniture: ["bench", "planter", "picnic_table", "lamp"],
+  activity: ["stall", "fountain", "stage"],
+  access: ["ramp"],
+};
+const paletteGroups = Object.keys(branchObjectGroups) as PaletteGroup[];
+const branchObjects = Object.values(branchObjectGroups).flat();
 
 /** The owner's own publications of this branch; never includes other people's data. */
 export type OwnerPublication = {
@@ -73,12 +107,15 @@ export type OwnerPublication = {
 export type BranchEditorProps = {
   locale: Locale;
   messages: EditorMessages;
+  perspectiveCopy: (typeof esMessages)["terrain"]["perspective"];
+  objectsCopy: Pick<(typeof esMessages)["terrain"], "furniture" | "placement">;
   head: BranchHead;
   publications: OwnerPublication[];
   userId: string;
   bounds: BoundingBox;
   boundary: DrawableGeometry;
   center: [number, number];
+  pilotContext: OsmContext;
 };
 
 type Status = {
@@ -101,31 +138,61 @@ const fill = fillTemplate;
 const publicationHrefFor = (locale: Locale, id: string) =>
   `/${locale}/publications/${id}`;
 
+function marketAndTreeOverlap(first: Intervention, second: Intervention) {
+  const [tree, market] =
+    first.kind === "shade_tree" ? [first, second] : [second, first];
+  return (
+    tree.kind === "shade_tree" &&
+    market.kind === "temporary_market" &&
+    ringCoversPoint(tree.geometry.coordinates, market.geometry.coordinates[0])
+  );
+}
+
 export function BranchEditor({
   locale,
   messages: m,
+  perspectiveCopy,
+  objectsCopy,
   head,
   publications: initialPublications,
   userId,
   bounds,
   boundary,
   center,
+  pilotContext,
 }: BranchEditorProps) {
   const storageKey = draftKey(userId, head.siteId, head.branchId);
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
 
-  const newFormValues = (kind: EditableKind): FormValues =>
+  const newFormValues = (
+    kind: EditableKind,
+    objectType: RevisionObjectKind = "bench",
+  ): FormValues =>
     toFormValues(
-      createDefaultIntervention(kind, crypto.randomUUID(), center, {
-        label: m.kinds[kind],
-        timeSlot: m.defaults.timeSlot,
-      }),
+      createDefaultIntervention(
+        kind,
+        crypto.randomUUID(),
+        center,
+        {
+          label:
+            kind === "urban_object"
+              ? objectsCopy.furniture[objectType]
+              : m.kinds[kind],
+          timeSlot: m.defaults.timeSlot,
+        },
+        objectType,
+      ),
       "add",
     );
 
   const [editor, setEditor] = useState<EditorState>(() =>
     createEditorState(head.features),
   );
+  const [showPerspective, setShowPerspective] = useState(false);
+  const [focusRequest, setFocusRequest] = useState<{
+    id: string;
+    sequence: number;
+  } | null>(null);
   const [savedFeatures, setSavedFeatures] = useState<readonly Intervention[]>(
     head.features,
   );
@@ -139,12 +206,17 @@ export function BranchEditor({
   );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [coordinatesOpen, setCoordinatesOpen] = useState(false);
+  const [paletteGroup, setPaletteGroup] = useState<PaletteGroup>("furniture");
   const [revisionMessage, setRevisionMessage] = useState("");
   const [status, setStatus] = useState<Status | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [saving, setSaving] = useState(false);
   const pendingSave = useRef<{ signature: string; key: string } | null>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
+  const previewHeading = useRef<HTMLHeadingElement>(null);
+  const canvasPanel = useRef<HTMLElement>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const justDragged = useRef(false);
   const [publications, setPublications] =
     useState<OwnerPublication[]>(initialPublications);
   const [publishLabel, setPublishLabel] = useState(
@@ -207,21 +279,101 @@ export function BranchEditor({
     formHeading.current?.focus();
   }
 
-  function resetForm(kind: EditableKind = form.kind) {
-    setForm(newFormValues(kind));
+  function viewFeature(id: string) {
+    setFocusRequest((previous) => ({
+      id,
+      sequence: (previous?.sequence ?? 0) + 1,
+    }));
+    setShowPerspective(true);
+    previewHeading.current?.focus();
+  }
+
+  function resetForm(
+    kind: EditableKind = form.kind,
+    objectType: RevisionObjectKind = form.objectType,
+  ) {
+    const available = branchObjects.includes(objectType) ? objectType : "bench";
+    setForm(newFormValues(kind, available));
+    if (kind === "urban_object") openObjectGroup(available);
     setFieldErrors({});
+  }
+
+  function openObjectGroup(objectType: RevisionObjectKind) {
+    const group = paletteGroups.find((key) =>
+      branchObjectGroups[key].includes(objectType),
+    );
+    if (group) setPaletteGroup(group);
+  }
+
+  function selectIntervention(value: string) {
+    const objectType = branchObjects.find((kind) => kind === value);
+    if (objectType) {
+      if (form.kind !== "urban_object") {
+        resetForm("urban_object", objectType);
+      } else {
+        setForm(selectObject(objectType));
+        openObjectGroup(objectType);
+        setFieldErrors({});
+      }
+      return;
+    }
+    const kind = editableKinds.find((kind) => kind === value);
+    if (kind) resetForm(kind);
   }
 
   function submitFeature(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = fromFormValues(form);
+    commitFeature(form);
+  }
+
+  function commitFeature(values: FormValues) {
+    const result = fromFormValues(values);
     if (!result.ok) {
       setFieldErrors(result.errors);
       return;
     }
 
     const label = result.feature.properties.label;
-    if (form.mode === "add") {
+    const candidate = result.feature;
+    const original = editor.features.find(({ id }) => id === candidate.id);
+    if (
+      candidate.kind === "urban_object" &&
+      boundary.type === "Polygon" &&
+      !footprintFitsSurface(
+        candidate.geometry.coordinates[0].slice(0, -1).map(([x, y]) => [x, y]),
+        [boundary.coordinates.map((ring) => ring.map(([x, y]) => [x, y]))],
+      )
+    ) {
+      setFieldErrors({ coordinates: "objectOutside" });
+      return;
+    }
+    if (
+      (!original ||
+        canonicalJson(original.geometry) !==
+          canonicalJson(candidate.geometry)) &&
+      editor.features.some(
+        (feature) =>
+          feature.id !== candidate.id &&
+          urbanObjectsOverlap(candidate, feature),
+      )
+    ) {
+      setFieldErrors({ coordinates: "objectOverlap" });
+      return;
+    }
+    if (
+      (!original ||
+        canonicalJson(original.geometry) !==
+          canonicalJson(candidate.geometry)) &&
+      editor.features.some(
+        (feature) =>
+          feature.id !== candidate.id &&
+          marketAndTreeOverlap(candidate, feature),
+      )
+    ) {
+      setFieldErrors({ coordinates: "marketTreeOverlap" });
+      return;
+    }
+    if (values.mode === "add") {
       setEditor((state) =>
         execute(state, addOperation(state.features, result.feature)),
       );
@@ -237,7 +389,15 @@ export function BranchEditor({
         setAnnouncement(fill(m.updated, { label }));
       }
     }
-    resetForm();
+    resetForm(values.kind, values.objectType);
+  }
+
+  function selectObject(kind: RevisionObjectKind) {
+    if (kind === form.objectType) return form;
+    return {
+      ...newFormValues("urban_object", kind),
+      coordinates: form.coordinates,
+    };
   }
 
   function removeFeature(feature: Intervention) {
@@ -269,6 +429,8 @@ export function BranchEditor({
     sent: Intervention[],
   ) {
     if (code === "feature_outside_site") return m.outsideSite;
+    if (code === "market_tree_overlap") return m.fieldErrors.marketTreeOverlap;
+    if (code === "urban_object_overlap") return m.fieldErrors.objectOverlap;
     const reason =
       m.reasons[code as keyof EditorMessages["reasons"]] ??
       m.reasons.invalid_feature;
@@ -451,7 +613,11 @@ export function BranchEditor({
 
   const geometryType = geometryTypeForKind[form.kind];
   const parsedDraft = parseCoordinates(form.coordinates, geometryType);
-  const draftGeometry = parsedDraft.ok ? parsedDraft.geometry : null;
+  const draftGeometry = parsedDraft.ok
+    ? form.kind === "urban_object" && parsedDraft.geometry.type === "Point"
+      ? urbanObjectFootprint(form.objectType, parsedDraft.geometry.coordinates)
+      : parsedDraft.geometry
+    : null;
   const setField = (field: FormField, value: string) =>
     setForm((current) => ({ ...current, [field]: value }));
   function pickPoint(longitude: number, latitude: number) {
@@ -462,7 +628,37 @@ export function BranchEditor({
     setFieldErrors((current) => ({ ...current, coordinates: undefined }));
     setAnnouncement(m.picked);
   }
+  function nudgePlacement(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!parsedDraft.ok) return;
+    const directions: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, 1],
+      ArrowDown: [0, -1],
+    };
+    const direction = directions[event.key];
+    if (!direction) return;
+    event.preventDefault();
+    const meters = event.shiftKey ? 8 : 1;
+    const [x, y] = coordinateCenter(parsedDraft.geometry);
+    const [west, south, east, north] = bounds;
+    pickPoint(
+      Math.min(
+        east,
+        Math.max(
+          west,
+          x +
+            (direction[0] * meters) / (111_195 * Math.cos((y * Math.PI) / 180)),
+        ),
+      ),
+      Math.min(north, Math.max(south, y + (direction[1] * meters) / 111_195)),
+    );
+  }
   const errorId = (field: FormField) => `editor-error-${field}`;
+  const placementError =
+    fieldErrors.coordinates === "objectOverlap" ||
+    fieldErrors.coordinates === "objectOutside" ||
+    fieldErrors.coordinates === "marketTreeOverlap";
   const fieldProps = (field: FormField) => ({
     id: `editor-${field}`,
     "aria-invalid": fieldErrors[field] ? true : undefined,
@@ -518,92 +714,8 @@ export function BranchEditor({
         </section>
       ) : null}
 
-      <section className="editor-canvas" aria-labelledby="editor-preview-title">
-        <div className="editor-toolbar">
-          <h2 id="editor-preview-title">{m.previewTitle}</h2>
-          <div className="button-row">
-            <button
-              className="button button-secondary"
-              type="button"
-              disabled={!canUndo(editor)}
-              onClick={() => {
-                setEditor(undo);
-                setAnnouncement(m.undone);
-              }}
-            >
-              {m.undo}
-            </button>
-            <button
-              className="button button-secondary"
-              type="button"
-              disabled={!canRedo(editor)}
-              onClick={() => {
-                setEditor(redo);
-                setAnnouncement(m.redone);
-              }}
-            >
-              {m.redo}
-            </button>
-          </div>
-        </div>
-        <RevisionPreview
-          ariaLabel={m.previewAria}
-          boundary={boundary}
-          bounds={bounds}
-          features={editor.features}
-          selectedId={form.mode === "edit" ? form.id : undefined}
-          draft={draftGeometry}
-          onPick={pickPoint}
-        />
-        <p className="field-help">{m.pickHint}</p>
-        <p className={dirty ? "pending-state pending-dirty" : "pending-state"}>
-          <span aria-hidden="true">{dirty ? "●" : "○"}</span>{" "}
-          {dirty ? m.pending : m.clean}
-        </p>
-
-        <h2 className="editor-list-title">{m.listTitle}</h2>
-        {editor.features.length === 0 ? (
-          <p className="empty-message">{m.empty}</p>
-        ) : null}
-        <ul className="editor-feature-list">
-          {editor.features.map((feature) => (
-            <li key={feature.id}>
-              <div>
-                <strong>{feature.properties.label}</strong>
-                <span>
-                  {m.kinds[feature.kind]} · {m.hypothetical} ·{" "}
-                  {summary(feature)}
-                </span>
-              </div>
-              <div className="button-row">
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  aria-label={fill(m.editAria, {
-                    label: feature.properties.label,
-                  })}
-                  onClick={() => startEdit(feature)}
-                >
-                  {m.edit}
-                </button>
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  aria-label={fill(m.removeAria, {
-                    label: feature.properties.label,
-                  })}
-                  onClick={() => removeFeature(feature)}
-                >
-                  {m.remove}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <aside className="editor-panel">
-        <form className="editor-form" onSubmit={submitFeature} noValidate>
+      <form className="editor-workspace" onSubmit={submitFeature} noValidate>
+        <div className="editor-form editor-picker">
           <h2 ref={formHeading} tabIndex={-1}>
             {form.mode === "add" ? m.addTitle : m.editTitle}
           </h2>
@@ -613,22 +725,251 @@ export function BranchEditor({
               <label htmlFor="editor-kind">{m.kindLabel}</label>
               <select
                 id="editor-kind"
-                value={form.kind}
-                onChange={(event) =>
-                  resetForm(event.target.value as EditableKind)
+                value={
+                  form.kind === "urban_object" ? form.objectType : form.kind
                 }
+                onChange={(event) => selectIntervention(event.target.value)}
               >
-                {editableKinds.map((kind) => (
-                  <option key={kind} value={kind}>
-                    {m.kinds[kind]}
-                  </option>
+                {editableKinds
+                  .filter((kind) => kind !== "urban_object")
+                  .map((kind) => (
+                    <option key={kind} value={kind}>
+                      {m.kinds[kind]}
+                    </option>
+                  ))}
+                {paletteGroups.map((group) => (
+                  <optgroup
+                    key={group}
+                    label={objectsCopy.placement.groups[group]}
+                  >
+                    {branchObjectGroups[group].map((kind) => (
+                      <option key={kind} value={kind}>
+                        {objectsCopy.furniture[kind]}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </>
           ) : (
-            <p className="form-kind">{m.kinds[form.kind]}</p>
+            <p className="form-kind">
+              {form.kind === "urban_object"
+                ? objectsCopy.furniture[form.objectType]
+                : m.kinds[form.kind]}
+            </p>
           )}
 
+          {form.kind === "urban_object" &&
+            form.mode === "add" &&
+            !showPerspective && (
+              <div className="editor-object-palette">
+                <label htmlFor="editor-object-category">
+                  {objectsCopy.placement.filter}
+                </label>
+                <select
+                  id="editor-object-category"
+                  value={paletteGroup}
+                  onChange={(event) => {
+                    const group = event.target.value as PaletteGroup;
+                    setPaletteGroup(group);
+                    if (!branchObjectGroups[group].includes(form.objectType))
+                      setForm(selectObject(branchObjectGroups[group][0]));
+                    setFieldErrors({});
+                  }}
+                >
+                  {paletteGroups.map(
+                    (key) => (
+                      <option key={key} value={key}>
+                        {objectsCopy.placement.groups[key]}
+                      </option>
+                    ),
+                  )}
+                </select>
+                <div className="terrain-catalog-tiles">
+                  {branchObjectGroups[paletteGroup].map((kind) => {
+                    const label = objectsCopy.furniture[kind];
+                    const { width, depth } = terrainObjects[kind];
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        aria-label={label}
+                        aria-pressed={form.objectType === kind}
+                        className="button shade-object-source"
+                        onClick={(event) => {
+                          if (event.detail > 0 && justDragged.current) return;
+                          if (form.objectType !== kind) {
+                            setForm(selectObject(kind));
+                            setFieldErrors({});
+                          }
+                          setShowPerspective(false);
+                        }}
+                        onPointerDown={(event) => {
+                          if (!event.isPrimary || event.button !== 0) return;
+                          event.currentTarget.setPointerCapture(
+                            event.pointerId,
+                          );
+                          justDragged.current = false;
+                          dragStart.current = {
+                            x: event.clientX,
+                            y: event.clientY,
+                          };
+                        }}
+                        onPointerUp={(event) => {
+                          const start = dragStart.current;
+                          dragStart.current = null;
+                          if (
+                            !start ||
+                            Math.hypot(
+                              event.clientX - start.x,
+                              event.clientY - start.y,
+                            ) < 8
+                          )
+                            return;
+                          justDragged.current = true;
+                          const svg =
+                            canvasPanel.current?.querySelector<SVGSVGElement>(
+                              ".editor-preview-pick",
+                            );
+                          const point =
+                            svg &&
+                            revisionPositionAt(
+                              svg,
+                              bounds,
+                              event.clientX,
+                              event.clientY,
+                            );
+                          if (!point) return;
+                          const chosen = selectObject(kind);
+                          const coordinates = placeAtPoint(
+                            chosen.coordinates,
+                            "Point",
+                            ...point,
+                          );
+                          setForm({ ...chosen, coordinates });
+                          commitFeature({ ...chosen, coordinates });
+                          event.preventDefault();
+                        }}
+                        onPointerCancel={() => {
+                          dragStart.current = null;
+                        }}
+                        onLostPointerCapture={() => {
+                          dragStart.current = null;
+                        }}
+                      >
+                        <TerrainObjectThumbnail kind={kind} />
+                        <span>{label}</span>
+                        <small>
+                          {fill(objectsCopy.placement.dimensions, {
+                            width: number.format(width),
+                            depth: number.format(depth),
+                          })}
+                        </small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+        </div>
+
+        <section
+          ref={canvasPanel}
+          className="editor-canvas"
+          aria-labelledby="editor-preview-title"
+        >
+          <div className="editor-toolbar">
+            <h2 id="editor-preview-title" ref={previewHeading} tabIndex={-1}>
+              {m.previewTitle}
+            </h2>
+            <div className="button-row">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={!canUndo(editor)}
+                onClick={() => {
+                  setEditor(undo);
+                  setAnnouncement(m.undone);
+                }}
+              >
+                {m.undo}
+              </button>
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={!canRedo(editor)}
+                onClick={() => {
+                  setEditor(redo);
+                  setAnnouncement(m.redone);
+                }}
+              >
+                {m.redo}
+              </button>
+            </div>
+          </div>
+          {boundary.type === "Polygon" && (
+            <div className="terrain-actions editor-preview-actions">
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={() => {
+                  resetForm("urban_object");
+                  setShowPerspective(false);
+                  formHeading.current?.focus();
+                }}
+              >
+                {m.objectPalette}
+              </button>
+              <button
+                className="button button-secondary"
+                type="button"
+                aria-pressed={showPerspective}
+                onClick={() => {
+                  setFocusRequest(null);
+                  setShowPerspective((current) => !current);
+                }}
+              >
+                {m.preview3d}
+              </button>
+            </div>
+          )}
+          {showPerspective && boundary.type === "Polygon" ? (
+            <>
+              <InterventionPerspective
+                key={focusRequest?.sequence ?? 0}
+                boundary={boundary}
+                center={center}
+                features={editor.features}
+                copy={{ ...perspectiveCopy, graphic: m.preview3dAria }}
+                initialFocusId={focusRequest?.id}
+                pilotContext={pilotContext}
+              />
+              <p className="editor-preview-help field-help">{m.preview3dHint}</p>
+            </>
+          ) : (
+            <>
+              <RevisionPreview
+                ariaLabel={m.previewAria}
+                boundary={boundary}
+                bounds={bounds}
+                features={editor.features}
+                selectedId={form.mode === "edit" ? form.id : undefined}
+                draft={draftGeometry}
+                markDraftCenter={form.kind === "urban_object"}
+                onPick={pickPoint}
+              />
+              <p className="editor-preview-help field-help">
+                {form.kind === "urban_object" ? m.objectPlanHint : m.pickHint}
+              </p>
+            </>
+          )}
+          <p className={dirty ? "pending-state pending-dirty" : "pending-state"}>
+            <span aria-hidden="true">{dirty ? "●" : "○"}</span>{" "}
+            {dirty ? m.pending : m.clean}
+          </p>
+        </section>
+
+        <div className="editor-form editor-placement">
           <label htmlFor="editor-label">{m.labelLabel}</label>
           <input
             {...fieldProps("label")}
@@ -638,7 +979,7 @@ export function BranchEditor({
           />
           {fieldError("label")}
 
-          {numericFields[form.kind].map(({ field, min, max, integer }) => (
+          {numericFieldsFor(form).map(({ field, min, max, integer }) => (
             <div className="form-field" key={field}>
               <label htmlFor={`editor-${field}`}>
                 {m[numericLabels[field]] as string} ({number.format(min)}–
@@ -671,12 +1012,54 @@ export function BranchEditor({
             </div>
           ) : null}
 
-          <p className="pick-callout">
-            <span aria-hidden="true">⌖</span> {m.pickInForm}
+          <p className="pick-callout" id="editor-placement-help">
+            <span aria-hidden="true">⌖</span>{" "}
+              {showPerspective
+                ? m.pickObjectIn3d
+                : form.kind === "urban_object"
+                  ? m.pickObject
+                  : m.pickInForm}
+          </p>
+          {showPerspective && (
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => setShowPerspective(false)}
+            >
+              {m.objectPlanAction}
+            </button>
+          )}
+          {placementError && (
+            <div role="alert">{fieldError("coordinates")}</div>
+          )}
+          <div className="button-row">
+            <button
+              className="button button-primary"
+              type="submit"
+              aria-describedby="editor-placement-help editor-keyboard-help"
+              onKeyDown={nudgePlacement}
+            >
+              {form.mode === "add" ? m.submitAdd : m.submitEdit}
+            </button>
+            {form.mode === "edit" ? (
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => resetForm()}
+              >
+                {m.cancel}
+              </button>
+            ) : null}
+          </div>
+          <p className="field-help" id="editor-keyboard-help">
+            {m.keyboardPlacement}
           </p>
           <details
             className="coordinates-details"
-            open={coordinatesOpen || Boolean(fieldErrors.coordinates)}
+            open={
+              coordinatesOpen ||
+              (!placementError && Boolean(fieldErrors.coordinates))
+            }
             onToggle={(event) => setCoordinatesOpen(event.currentTarget.open)}
           >
             <summary>{m.coordinatesToggle}</summary>
@@ -697,24 +1080,79 @@ export function BranchEditor({
               value={form.coordinates}
               onChange={(event) => setField("coordinates", event.target.value)}
             />
-            {fieldError("coordinates")}
+            {!placementError && fieldError("coordinates")}
           </details>
-          <div className="button-row">
-            <button className="button button-primary" type="submit">
-              {form.mode === "add" ? m.submitAdd : m.submitEdit}
-            </button>
-            {form.mode === "edit" ? (
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => resetForm()}
-              >
-                {m.cancel}
-              </button>
-            ) : null}
-          </div>
-        </form>
+          <p className="editor-next-step">
+            {dirty ? (
+              <a href="#editor-message">{m.nextSave}</a>
+            ) : !publishBlocker ? (
+              <a href="#publish-label">{m.nextPublish}</a>
+            ) : (
+              <span>{headPublication ? m.nextEdit : m.nextAdd}</span>
+            )}
+          </p>
+        </div>
+      </form>
 
+      <section className="editor-canvas" aria-labelledby="editor-list-title">
+        <h2 id="editor-list-title" className="editor-list-title">
+          {m.listTitle}
+        </h2>
+        {editor.features.length === 0 ? (
+          <p className="empty-message">{m.empty}</p>
+        ) : null}
+        <ul className="editor-feature-list">
+          {editor.features.map((feature) => (
+            <li key={feature.id}>
+              <div>
+                <strong>{feature.properties.label}</strong>
+                <span>
+                  {feature.kind === "urban_object"
+                    ? objectsCopy.furniture[feature.properties.objectType]
+                    : m.kinds[feature.kind]}{" "}
+                  · {m.hypothetical} · {summary(feature)}
+                </span>
+              </div>
+              <div className="button-row">
+                {boundary.type === "Polygon" && (
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    aria-label={fill(m.viewIn3dAria, {
+                      label: feature.properties.label,
+                    })}
+                    onClick={() => viewFeature(feature.id)}
+                  >
+                    {m.viewIn3d}
+                  </button>
+                )}
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  aria-label={fill(m.editAria, {
+                    label: feature.properties.label,
+                  })}
+                  onClick={() => startEdit(feature)}
+                >
+                  {m.edit}
+                </button>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  aria-label={fill(m.removeAria, {
+                    label: feature.properties.label,
+                  })}
+                  onClick={() => removeFeature(feature)}
+                >
+                  {m.remove}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <aside className="editor-panel">
         <form className="editor-form save-form" onSubmit={saveRevision}>
           <h2>{m.saveTitle}</h2>
           <label htmlFor="editor-message">{m.messageLabel}</label>

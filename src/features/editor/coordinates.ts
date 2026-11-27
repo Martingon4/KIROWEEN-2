@@ -18,15 +18,30 @@ const minimumVertices: Record<GeometryType, number> = {
   Polygon: 3,
 };
 
-export function formatCoordinates(geometry: InterventionGeometry): string {
-  const vertices =
+function openVertices(geometry: InterventionGeometry) {
+  return (
     geometry.type === "Point"
       ? [geometry.coordinates]
       : geometry.type === "LineString"
         ? geometry.coordinates
-        : geometry.coordinates[0].slice(0, -1);
+        : geometry.coordinates[0].slice(0, -1)
+  );
+}
 
-  return vertices
+export function coordinateCenter(
+  geometry: InterventionGeometry,
+): [number, number] {
+  const vertices = openVertices(geometry);
+  const lons = vertices.map(([longitude]) => longitude);
+  const lats = vertices.map(([, latitude]) => latitude);
+  return [
+    (Math.min(...lons) + Math.max(...lons)) / 2,
+    (Math.min(...lats) + Math.max(...lats)) / 2,
+  ];
+}
+
+export function formatCoordinates(geometry: InterventionGeometry): string {
+  return openVertices(geometry)
     .map(([longitude, latitude]) => `${longitude}, ${latitude}`)
     .join("\n");
 }
@@ -101,17 +116,10 @@ export function placeAtPoint(
   if (type === "Point") return `${lon}, ${lat}`;
   const parsed = parseCoordinates(text, type);
   if (parsed.ok) {
-    const vertices =
-      parsed.geometry.type === "Polygon"
-        ? parsed.geometry.coordinates[0].slice(0, -1)
-        : parsed.geometry.type === "LineString"
-          ? parsed.geometry.coordinates
-          : [parsed.geometry.coordinates];
-    const lons = vertices.map((vertex) => vertex[0]);
-    const lats = vertices.map((vertex) => vertex[1]);
-    const dx = lon - (Math.min(...lons) + Math.max(...lons)) / 2;
-    const dy = lat - (Math.min(...lats) + Math.max(...lats)) / 2;
-    return vertices
+    const [x, y] = coordinateCenter(parsed.geometry);
+    const dx = lon - x;
+    const dy = lat - y;
+    return openVertices(parsed.geometry)
       .map(([x, y]) => `${roundCoordinate(x + dx)}, ${roundCoordinate(y + dy)}`)
       .join("\n");
   }

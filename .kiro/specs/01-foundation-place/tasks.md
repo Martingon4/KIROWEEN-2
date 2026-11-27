@@ -40,7 +40,7 @@
   - Preserve the schematic and feature list when tiles/WebGL fail.
   - Check: Chromium WebGL flow plus controlled network failure.
 
-- [x] **8. Establish CI, hook, and clean-clone smoke** — FT-17, FT-18
+- [x  ] **8. Establish CI, hook, and clean-clone smoke** — FT-17, FT-18
   - Added CI workflow, Kiro `PostTaskExec` hook, and a clean-copy smoke command.
   - Verified so far: `npx --yes -p node@24 -c 'npm run smoke:clean'` passed on Node v24.22.3 (clean copy, `npm ci`, lint, types, unit tests, build without `.env.local`); `.kiro/hooks/check-after-task.json` is valid (one `PostTaskExec` hook, 300 s timeout) and its command (`npm run lint && npm run typecheck && npm run test:unit`) exits 0 in about 20 s (206 unit tests); the full `check:ci` passed on Node 24 after a clean database reset (see `docs/progress.md`). Running the command by hand is not a hook trigger.
   - Still open: one real `PostTaskExec` firing, which Kiro produces only when a Spec task is set to completed from the Spec UI. Remote GitHub Actions has not run because nothing was pushed.

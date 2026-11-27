@@ -1,5 +1,10 @@
 import { roundCoordinate } from "@/lib/geo/canonical";
+import { urbanObjectFootprint } from "@/lib/geo/urban-object";
 import type { EditableKind, Intervention } from "@/lib/schemas/intervention";
+import {
+  terrainObjects,
+  type RevisionObjectKind,
+} from "@/lib/schemas/terrain-objects";
 
 type Position = [number, number];
 
@@ -16,6 +21,7 @@ export function createDefaultIntervention(
   id: string,
   center: Position,
   labels: { label: string; timeSlot: string },
+  objectType: RevisionObjectKind = "bench",
 ): Intervention {
   const square = [
     at(center, -HALF_SIZE, -HALF_SIZE),
@@ -65,6 +71,17 @@ export function createDefaultIntervention(
           ],
         },
       };
+    case "urban_object":
+      return {
+        id,
+        kind,
+        properties: {
+          label: labels.label,
+          objectType,
+          heightM: terrainObjects[objectType].height,
+        },
+        geometry: urbanObjectFootprint(objectType, center),
+      };
   }
 }
 
@@ -76,4 +93,5 @@ export const geometryTypeForKind: Record<
   shade_canopy: "Polygon",
   temporary_market: "Polygon",
   proposed_crossing: "LineString",
+  urban_object: "Point",
 };

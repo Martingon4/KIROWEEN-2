@@ -1,6 +1,6 @@
 begin;
 
-select plan(292);
+select plan(297);
 
 create temp table ctx (name text primary key, id uuid, doc jsonb);
 grant all on table ctx to anon, authenticated;
@@ -503,6 +503,36 @@ select throws_ok(
   $$select public.merge_commit(public.t_id('bA2'), public.t_id('pB'), public.t_id('hA2'), 'Merge remove', '[]'::jsonb, 'merge-replay-0001', repeat('9', 64))$$,
   'FT001', 'idempotency_key_reused', 'same key with a different hash is FT001'
 );
+
+-- New occupation rules use the trunk location and a modeled crossing width.
+insert into ctx select 'b_occupancy', public.t_branch('Tronco dentro del mercado'), null;
+select throws_ok(
+  $$select public.t_save(public.t_id('b_occupancy'), jsonb_build_array(
+    public.t_market(public.t_uid('a1'), public.t_mkt()),
+    public.t_tree(public.t_uid('a2'), public.t_pt(-98.19815, 19.04365))))$$,
+  'FT422', 'market_tree_overlap', 'saving a trunk inside a market rolls back');
+select throws_ok(
+  $$select public.t_save(public.t_id('b_occupancy'), jsonb_build_array(
+    public.t_tree(public.t_uid('a2'), public.t_pt(-98.19820, 19.04365)),
+    public.t_market(public.t_uid('a1'), public.t_mkt())))$$,
+  'FT422', 'market_tree_overlap', 'the market also covers the trunk on its boundary');
+insert into ctx select 'r_occupancy', public.t_save(public.t_id('b_occupancy'),
+  jsonb_build_array(public.t_tree(public.t_uid('a2'), public.t_pt(-98.19815, 19.04365)))), null;
+insert into ctx select 'pv_occupancy', null, public.t_prev(public.t_id('b_occupancy'), public.t_id('pB'));
+select is(pg_catalog.jsonb_array_length(public.t_doc('pv_occupancy') -> 'unresolved'),
+  1, 'merge makes a trunk inside the incoming market a blocking conflict');
+select is((public.t_doc('pv_occupancy') #>> '{conflicts,0,thresholdM2}')::numeric,
+  0::numeric, 'a trunk conflict uses point occupancy, not the area threshold');
+
+insert into ctx select 'b_walkway', public.t_branch('Paso peatonal'), null;
+insert into ctx select 'r_walkway', public.t_save(public.t_id('b_walkway'), jsonb_build_array(
+  jsonb_build_object('id', public.t_uid('a3'), 'kind', 'proposed_crossing',
+    'properties', '{"label":"Paso de prueba","widthM":4}'::jsonb,
+    'geometry', '{"type":"LineString","coordinates":[[-98.19816,19.04359],[-98.19816,19.04371]]}'::jsonb)
+)), null;
+select cmp_ok((public.t_prev(public.t_id('b_walkway'), public.t_id('pB'))
+    #>> '{conflicts,0,intersectionM2}')::numeric, '>', 1::numeric,
+  'a market crossing the modeled pedestrian corridor creates an area conflict');
 
 -- 6. Disjoint changes: source adds a tree, target adds a far canopy
 insert into ctx select 'bA4', public.t_branch('Disjoint A'), null;

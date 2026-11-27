@@ -79,6 +79,12 @@ test("la persona participante publica, compara con la línea base y ve la sombra
   await compareFromPublication(page, publicationId);
 
   await expect(h1(page, "Comparación de propuestas")).toBeVisible();
+  const overview = page.getByRole("region", { name: "Resumen de la comparación" });
+  await expect(overview).toContainText(
+    "No se detectaron solapamientos entre los cambios.",
+  );
+  await expect(overview).toContainText(/\+[\d.,]+ m²/);
+  await expect(overview).toContainText("Costo ilustrativo por alternativa");
   await expect(
     page.getByRole("heading", { level: 2, name: "Indicadores" }),
   ).toBeVisible();
@@ -262,6 +268,7 @@ test("la página de comparación no tiene hallazgos graves ni desbordamiento a 3
   await page.goto(url);
   await expect(h1(page, "Comparación de propuestas")).toBeVisible();
   await expect(page.locator(".cmp-badge-added").first()).toBeVisible();
+  await expect(page.getByRole("img", { name: /Vista esquemática en 3D/ })).toBeVisible();
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(
@@ -284,6 +291,48 @@ test("la página de comparación no tiene hallazgos graves ni desbordamiento a 3
   ).toBeLessThanOrEqual(0);
 });
 
+test("la simulación conserva la cubierta compartida y cambia su sombra según la hora", async ({ page }) => {
+  await signIn(page);
+  const publicationId = await publishCanopy(page, "Sombra 3D");
+  const ref = `publication:${publicationId}`;
+  await page.goto(`/es/compare?left=${ref}&right=${ref}`);
+
+  await expect(page.getByText("Las dos revisiones tienen las mismas intervenciones.")).toBeVisible();
+  const scene = page.getByRole("region", { name: "Simulación de sombra en 3D" });
+  const footprint = scene.locator(".shade-footprint");
+  await expect(footprint).toHaveCount(1);
+  const morning = await footprint.getAttribute("d");
+  await scene.getByLabel("Revisión").selectOption("left");
+  await scene.getByLabel("Hora en Puebla").selectOption("equinox-1600");
+  await scene.getByRole("button", { name: "Actualizar simulación" }).press("Enter");
+
+  await expect(page).toHaveURL(/scenario=equinox-1600#shade-3d$/);
+  await expect(scene.getByLabel("Revisión")).toHaveValue("left");
+  await expect(scene.getByLabel("Hora en Puebla")).toHaveValue("equinox-1600");
+  await expect(footprint).toHaveCount(1);
+  await expect(footprint).not.toHaveAttribute("d", morning!);
+
+  const add = scene.getByRole("button", { name: "Agregar objeto" });
+  await add.press("ArrowRight");
+  await add.press("Enter");
+  await expect(footprint).toHaveCount(2);
+  const before = await scene.locator(".shade-scene").innerHTML();
+  await scene.getByRole("spinbutton", { name: "2. Árbol · Altura (m)" }).fill("12");
+  await expect.poll(() => scene.locator(".shade-scene").innerHTML()).not.toBe(before);
+  await scene.getByRole("button", { name: "Eliminar 2. Árbol" }).click();
+  await expect(footprint).toHaveCount(1);
+
+  const canopy = scene.getByRole("button", { name: "Cubierta", exact: true });
+  await canopy.evaluate((button) => button.scrollIntoView({ block: "start", behavior: "instant" }));
+  const source = (await canopy.boundingBox())!;
+  const ground = (await scene.locator(".shade-scene-ground").boundingBox())!;
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(ground.x + ground.width / 2, ground.y + ground.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(footprint).toHaveCount(2);
+});
+
 test("la ruta en inglés muestra la comparación en inglés", async ({ page }) => {
   await signIn(page);
   const publicationId = await publishCanopy(page, "Comparar English");
@@ -291,7 +340,12 @@ test("la ruta en inglés muestra la comparación en inglés", async ({ page }) =
 
   await page.goto(url.replace("/es/compare", "/en/compare"));
   await expect(h1(page, "Proposal comparison")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Comparison overview" }),
+  ).toContainText("No overlaps were detected between the changes.");
   await expect(page.locator(".cmp-badge-added").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "3D shade simulation" })).toBeVisible();
+  await expect(page.getByLabel("Time in Puebla")).toHaveValue("equinox-1000");
   await expect(page.getByRole("link", { name: "Español" })).toHaveAttribute(
     "href",
     /^\/es\/compare\?left=/,

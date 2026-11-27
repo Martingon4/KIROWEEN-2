@@ -25,8 +25,9 @@ export default async function HomePage({ params }: PageProps) {
       />
       <nav
         className="dossier-home-link"
-        aria-label={messages[locale].dossier.listTitle}
+        aria-label={messages[locale].nav.places}
       >
+        <Link href={`/${locale}/terrain`}>{messages[locale].terrain.link}</Link>
         <Link href={`/${locale}/dossiers`}>
           {messages[locale].dossier.listLink}
         </Link>

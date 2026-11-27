@@ -25,6 +25,8 @@ const featureCodes = new Set([
   "invalid_geometry",
   "too_many_vertices",
   "too_many_features",
+  "market_tree_overlap",
+  "urban_object_overlap",
 ]);
 
 function featureIndex(details: string | null | undefined) {

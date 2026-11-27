@@ -3,6 +3,8 @@ import { join } from "node:path";
 import {
   geoJsonFeatureCollectionSchema,
   localizedNameSchema,
+  positionSchema,
+  supportedGeometrySchema,
   type GeoJsonFeatureCollection,
 } from "@/lib/schemas/geojson";
 import type { Locale } from "@/lib/i18n/locales";
@@ -41,6 +43,22 @@ const manifestSchema = z.object({
   ),
 });
 
+const osmContextSchema = z.object({
+  type: z.literal("FeatureCollection"),
+  bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  features: z.array(z.object({
+    type: z.literal("Feature"),
+    id: z.string(),
+    properties: z.object({ kind: z.enum(["building", "street", "path", "crossing"]) }),
+    geometry: z.union([
+      supportedGeometrySchema,
+      z.object({ type: z.literal("LineString"), coordinates: z.array(positionSchema).min(2) }),
+    ]),
+  })),
+});
+
+export type OsmContext = z.infer<typeof osmContextSchema>;
+
 export type PublicSite = {
   id: string;
   slug: string;
@@ -60,6 +78,7 @@ export type PublicSite = {
   bounds: readonly [number, number, number, number];
   baseline: GeoJsonFeatureCollection;
   scenario: GeoJsonFeatureCollection;
+  osmContext: OsmContext;
 };
 
 const dataRoot = join(process.cwd(), "data", "sites", "zocalo-puebla");
@@ -98,4 +117,5 @@ export const pilotSite: PublicSite = {
   bounds: manifest.boundingBox,
   baseline,
   scenario,
+  osmContext: osmContextSchema.parse(readProjectJson("osm-context.geojson")),
 };

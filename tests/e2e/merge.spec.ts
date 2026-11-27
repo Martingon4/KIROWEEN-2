@@ -178,6 +178,7 @@ async function expectBlockingConflict(page: Page, story: Story) {
     conflict.getByRole("group", { name: "Cómo resolver este conflicto" }),
   ).toBeVisible();
   await expect(commitButton(page)).toBeDisabled();
+  await expect(page.locator(".preview-conflict")).toHaveCount(2);
   await expect(
     page.getByText(
       "Resuelve todos los conflictos y revisa tus decisiones antes de guardar.",
@@ -302,6 +303,19 @@ test("la API de fusión: vista previa, conflictos, versión obsoleta e idempoten
     intersectionM2: number;
   };
   expect(conflict.intersectionM2).toBeGreaterThan(100);
+  await page.goto(
+    `/es/compare?left=revision:${story.branchHeadId}&right=publication:${story.publicationId}`,
+  );
+  const overview = page.getByRole("region", { name: "Resumen de la comparación" });
+  await expect(overview).toContainText(story.canopyLabel);
+  await expect(overview).toContainText(story.marketLabel);
+  const overlap = new Intl.NumberFormat("es", {
+    maximumFractionDigits: 2,
+  }).format(conflict.intersectionM2);
+  await expect(overview).toContainText(`${overlap} m²`);
+  await overview.getByRole("link", { name: "Ver mapa de cambios" }).click();
+  await expect(page).toHaveURL(/#compare-map-title$/);
+
   const marketId =
     conflict.featureIds[conflict.kinds.indexOf("temporary_market")];
   expect(marketId).toBeTruthy();
@@ -456,6 +470,7 @@ test("la página de fusión es accesible y cabe en 360 px", async ({
   browser,
   baseURL,
 }) => {
+  test.setTimeout(60_000);
   const story = await setupStory(page, browser, baseURL);
   await page.setViewportSize({ width: 360, height: 800 });
   await openMergePreview(page, story);

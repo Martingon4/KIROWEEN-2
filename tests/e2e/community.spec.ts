@@ -12,12 +12,12 @@ import {
   addDefaultCanopy,
   api,
   createBranch,
+  localSupabaseDbContainer,
   openEditor,
   signIn,
 } from "./helpers";
 
 const SITE_ID = "8f5a6417-5f6d-4f02-a50c-76d97167db99";
-const DB_CONTAINER = "supabase_db_KIROWEEN-2";
 
 /**
  * Borra las ventanas de límite de uso de cuentas de prueba fijas, para que repetir la
@@ -42,7 +42,7 @@ function clearRateWindows(
       [
         "exec",
         "-i",
-        DB_CONTAINER,
+        localSupabaseDbContainer(),
         "psql",
         "-U",
         "postgres",

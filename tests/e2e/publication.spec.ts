@@ -7,6 +7,7 @@ import {
   api,
   createBranch,
   featureList,
+  localSupabaseDbContainer,
   openEditor,
   signIn,
 } from "./helpers";
@@ -413,7 +414,7 @@ test("una publicación oculta por moderación se muestra sin enlace y la página
   // Moderación simulada desde la base de datos; argumentos como arreglo, sin shell.
   execFileSync("docker", [
     "exec",
-    "supabase_db_KIROWEEN-2",
+    localSupabaseDbContainer(),
     "psql",
     "-U",
     "postgres",

@@ -58,6 +58,12 @@ async function BranchesContent({ params, searchParams }: BranchesPageProps) {
           <p className="eyebrow">{copy.eyebrow}</p>
           <h1 id="branch-title">{copy.title}</h1>
           <p className="hero-body">{copy.body}</p>
+          <div className="branch-terrain-entry">
+            <Link className="button button-secondary" href={`/${locale}/terrain`}>
+              {messages[locale].terrain.link}
+            </Link>
+            <p className="field-help">{copy.terrainHelp}</p>
+          </div>
         </div>
         <form action={createBranch}>
           <input type="hidden" name="siteId" value={pilotSite.id} />

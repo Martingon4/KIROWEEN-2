@@ -2,14 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { ShadeSimulation } from "@/features/compare/shade-scene";
 import { fillTemplate } from "@/features/editor/describe";
 import { pilotSite } from "@/features/places/site-data";
 import { formatCentsRange } from "@/lib/format/money";
 import { projectGeometry, type DrawableGeometry } from "@/lib/geo/project";
 import { isLocale, type Locale } from "@/lib/i18n/locales";
 import {
-  compareResultSchema,
+  comparePageResultSchema,
   SNAPSHOT_REF_PATTERN,
+  type ComparePageResult,
   type CompareResult,
 } from "@/lib/schemas/compare";
 import { createClient } from "@/lib/supabase/server";
@@ -20,11 +22,11 @@ const messages = { es, en } as const;
 
 type ComparePageProps = {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ left?: string; right?: string; scenario?: string }>;
+  searchParams: Promise<{ left?: string; right?: string; scenario?: string; shade?: string }>;
 };
 
 type CompareState =
-  | { status: "found"; result: CompareResult }
+  | { status: "found"; result: ComparePageResult }
   | { status: "not_found" }
   | { status: "incompatible" }
   | { status: "invalid" }
@@ -39,7 +41,7 @@ async function loadCompare(
     return { status: "invalid" };
   }
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("compare_revisions", {
+  const { data, error } = await supabase.rpc("compare_revisions_for_page", {
     p_left: left,
     p_right: right,
     p_scenario_slug: scenario,
@@ -50,7 +52,7 @@ async function loadCompare(
     if (error.code === "FT422") return { status: "incompatible" };
     return { status: "error" };
   }
-  const parsed = compareResultSchema.safeParse(data);
+  const parsed = comparePageResultSchema.safeParse(data);
   return parsed.success
     ? { status: "found", result: parsed.data }
     : { status: "error" };
@@ -159,6 +161,7 @@ async function CompareContent({ params, searchParams }: ComparePageProps) {
   const left = query.left ?? "";
   const right = query.right ?? "";
   const scenario = query.scenario ?? null;
+  const shadeSide = query.shade === "left" ? "left" : "right";
   const state =
     left && right
       ? await loadCompare(left, right, scenario)
@@ -167,7 +170,7 @@ async function CompareContent({ params, searchParams }: ComparePageProps) {
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const switchQuery =
     left && right
-      ? `?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}${scenario ? `&scenario=${encodeURIComponent(scenario)}` : ""}`
+      ? `?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}${scenario ? `&scenario=${encodeURIComponent(scenario)}` : ""}${query.shade ? `&shade=${shadeSide}#shade-3d` : ""}`
       : "";
 
   return (
@@ -218,6 +221,26 @@ async function CompareContent({ params, searchParams }: ComparePageProps) {
             const currency = result.right.cost.currency ?? "MXN";
             const sideName = (side: CompareResult["left"]) =>
               side.refKind === "baseline" ? c.baselineLabel : side.label;
+            const sideCost = (side: CompareResult["left"]) => {
+              const { cost } = side;
+              if (
+                cost.partial &&
+                !cost.lines.some(({ status }) => status === "priced")
+              ) {
+                return c.overview.unpriced;
+              }
+              const range = formatCentsRange(
+                cost.totalLowCents,
+                cost.totalHighCents,
+                cost.currency ?? currency,
+                locale,
+              );
+              return cost.partial ? `${range} · ${c.overview.partial}` : range;
+            };
+            const signedNumber = new Intl.NumberFormat(locale, {
+              maximumFractionDigits: 2,
+              signDisplay: "exceptZero",
+            });
             const changedLabel = (
               feature: CompareResult["features"][number],
             ) => {
@@ -240,6 +263,72 @@ async function CompareContent({ params, searchParams }: ComparePageProps) {
                     engine: result.engineVersion,
                   })}
                 </p>
+                <section
+                  className="compare-overview"
+                  aria-labelledby="compare-overview-title"
+                >
+                  <h2 id="compare-overview-title">{c.overview.title}</h2>
+                  <div className="compare-overview-grid">
+                    <div
+                      className={
+                        result.spatialOverlaps.count > 0
+                          ? "compare-overlap-alert"
+                          : undefined
+                      }
+                    >
+                      <h3>{c.overview.overlaps}</h3>
+                      {result.spatialOverlaps.count > 0 ? (
+                        <>
+                          <p>
+                            {fillTemplate(c.overview.overlapCount, {
+                              count: number.format(result.spatialOverlaps.count),
+                            })}
+                          </p>
+                          <ul>
+                            {result.spatialOverlaps.examples.map((pair, index) => (
+                              <li key={index}>
+                                <strong>
+                                  {pair.leftLabel} / {pair.rightLabel}
+                                </strong>
+                                <span>
+                                  {pair.intersectionM2 === null
+                                    ? c.overview.point
+                                    : pair.intersectionM2 === 0
+                                      ? `< ${number.format(0.01)} m²`
+                                      : `${number.format(pair.intersectionM2)} m²`}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <p>{c.overview.clear}</p>
+                      )}
+                      <a href="#compare-map-title">{c.overview.openMap}</a>
+                    </div>
+                    <div>
+                      <h3>{c.overview.shade}</h3>
+                      <p className="compare-overview-value">
+                        {signedNumber.format(result.metricDeltas.shadeM2)} m²
+                      </p>
+                      <p className="field-help">{c.deltaColumn}</p>
+                    </div>
+                    <div>
+                      <h3>{c.overview.cost}</h3>
+                      <dl className="compare-overview-costs">
+                        {([
+                          ["A", result.left],
+                          ["B", result.right],
+                        ] as const).map(([letter, side]) => (
+                          <div key={letter}>
+                            <dt>{letter} · {sideName(side)}</dt>
+                            <dd>{sideCost(side)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  </div>
+                </section>
                 <ul className="publication-notices">
                   <li>{c.hypothetical}</li>
                   {result.right.cost.label !== "sourced" ||
@@ -327,24 +416,13 @@ async function CompareContent({ params, searchParams }: ComparePageProps) {
                         </tr>
                         <tr>
                           <th scope="row">{c.costRange}</th>
+                          <td>{sideCost(result.left)}</td>
+                          <td>{sideCost(result.right)}</td>
                           <td>
-                            {formatCentsRange(
-                              result.left.cost.totalLowCents,
-                              result.left.cost.totalHighCents,
-                              currency,
-                              locale,
-                            )}
-                          </td>
-                          <td>
-                            {formatCentsRange(
-                              result.right.cost.totalLowCents,
-                              result.right.cost.totalHighCents,
-                              currency,
-                              locale,
-                            )}
-                          </td>
-                          <td>
-                            {result.catalogCompatible && result.costDelta ? (
+                            {result.catalogCompatible &&
+                            result.costDelta &&
+                            !result.left.cost.partial &&
+                            !result.right.cost.partial ? (
                               formatCentsRange(
                                 result.costDelta.totalLowCents,
                                 result.costDelta.totalHighCents,
@@ -384,8 +462,19 @@ async function CompareContent({ params, searchParams }: ComparePageProps) {
                   ) : null}
                 </section>
 
+                <ShadeSimulation
+                  result={result}
+                  locale={locale}
+                  side={shadeSide}
+                  sideName={{ left: sideName(result.left), right: sideName(result.right) }}
+                  copy={c.shadeScene}
+                />
+                <p><Link href={`/${locale}/terrain`}>{copy.terrain.link}</Link></p>
+
                 <section aria-labelledby="compare-map-title">
-                  <h2 id="compare-map-title">{c.mapTitle}</h2>
+                  <h2 id="compare-map-title" tabIndex={-1}>
+                    {c.mapTitle}
+                  </h2>
                   <p className="field-help">
                     {fillTemplate(c.countsLine, {
                       added: result.counts.added,

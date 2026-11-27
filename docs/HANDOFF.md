@@ -5,7 +5,7 @@ Contexto del producto: `.kiro/steering/*`, `AGENTS.md`, `FORK-THE-CITY-PLAN-KIRO
 
 ## Hecho (Specs 01 a 05, FT-01 a FT-15)
 Lugar piloto (Zócalo de Puebla), cuentas y RLS, editor con ramas y revisiones inmutables, publicación, fork, escenarios solares, comparación, fusión con conflictos, comunidad y moderación, expedientes con hitos, evidencia y exportaciones (HTML, GeoJSON, CSV, JSON).
-Último `npm run check:ci` en Node 24 tras reset limpio: exit 0 (unit 462, pgTAP 2835 en 24 archivos, Playwright 135). Después se añadió "colocar tocando la vista previa" en el editor: unit 478, specs editor/merge/fork/publication/compare 90 pasan. **Falta volver a correr `check:ci` completo y actualizar los totales en `docs/progress.md`.**
+El candidato parte de `81e7fdd` (Specs 01–05), con [GitHub Actions en verde](https://github.com/Martingon4/KIROWEEN-2/actions/runs/45466384450). El registro de la validación local de entrega está en [progress.md](progress.md). La [Spec 06](../.kiro/specs/06-delivery/tasks.md) reúne el guion, Devpost y lo pendiente. La demo usa un solo sitio y el flujo de edición 2D.
 
 ## Cómo arrancar
 ```bash
@@ -26,12 +26,12 @@ Playwright reutiliza el servidor del puerto 3100: ciérralo antes de correr E2E 
 - No afirmar que una comprobación corrió si no corrió; registrar comandos y resultados reales en `docs/progress.md`.
 
 ## Pendiente
-1. **Commit y push** (no hecho; el repo solo tiene "Initial commit" y casi todo está sin versionar). Pedir aprobación al usuario antes del push. Tras el push, mirar que GitHub Actions pase (el CI remoto nunca ha corrido).
-2. **Pulido visual** y capturas de evidencia en `docs/kiro-evidence/`: expediente (`/es/dossiers/<id>` y `/manage`) a 1440 px y 390 px, editor, lista de ramas (se ve plana, sin separación), comparación, fusión, moderación. Guardar con un spec Playwright temporal y borrarlo después.
-3. **Spec 06 (solo video y entrega):** guion del video, grabación, texto de Devpost, informe final. Crear `.kiro/specs/06-*` con requirements, design y tasks.
+1. **Publicación del candidato.** Verificar el estado de GitHub Actions en el commit que se publique. El push y el despliegue requieren aprobación y acceso al destino.
+2. **Evidencia visual.** La lista de ramas tiene separación entre filas y las siete vistas del recorrido tienen capturas a 1440 y 390 px. Consultar [kiro-evidence.md](kiro-evidence.md).
+3. **Grabación y presentación.** Grabar el recorrido de la Spec 06 con subtítulos en inglés y completar los enlaces públicos de Devpost.
 4. **Hook de Spec 01 (tarea 8):** sin evidencia de disparo real. Si se disparó en otro chat, debe existir `.kiro/hooks/run.log`; si no existe, dejarlo documentado como no evidenciado.
-5. **Ejecutar `npm run check:ci` en Node 24** (`npx --yes -p node@24 -c 'npm run check:ci'`) tras `supabase db reset` + `npm run provision:local`, y anotar los totales exactos.
-6. **Limpiar datos de prueba:** la cuenta de participante tiene decenas de ramas creadas por E2E. `db reset` + `provision:local` las borra.
+5. **Aprobación de despliegue.** Confirmar proyecto de Supabase alojado y aplicación de Vercel, y verificar acceso del jurado desde una sesión limpia.
+6. **Datos de grabación.** Usar cuentas y propuestas de demostración en un entorno dedicado. Consultar la preparación del ensayo en la Spec 06.
 
 ## Limitaciones conocidas (documentadas en ADR 0006)
 Sin retirada de evidencia; la corrección solo revierte el último cambio de estado; `targetDate` solo valida forma; la página de expediente no disponible reutiliza la de publicación; un refresco tardío puede reiniciar campos del formulario de gestión en móvil; la vista previa del editor es esquemática (SVG), no un mapa con calles.

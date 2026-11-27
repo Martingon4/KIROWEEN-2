@@ -190,7 +190,7 @@ async function PublicationContent({
                   <li key={feature.id}>
                     <strong>{feature.properties.label}</strong>
                     <span>
-                      {copy.editor.kinds[feature.kind]} ·{" "}
+                      {feature.kind === "urban_object" ? copy.terrain.furniture[feature.properties.objectType] : copy.editor.kinds[feature.kind]} ·{" "}
                       {copy.editor.hypothetical} ·{" "}
                       {describeIntervention(
                         feature,

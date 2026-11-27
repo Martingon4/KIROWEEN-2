@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { positionSchema } from "@/lib/schemas/geojson";
+import { revisionObjectKinds } from "./terrain-objects";
 
 /** Limits shared with `public.save_revision` in the database. */
 export const MAX_FEATURES_PER_REVISION = 200;
@@ -12,6 +13,7 @@ export const editableKinds = [
   "shade_canopy",
   "temporary_market",
   "proposed_crossing",
+  "urban_object",
 ] as const;
 
 export type EditableKind = (typeof editableKinds)[number];
@@ -87,6 +89,22 @@ export const interventionSchema = z.discriminatedUnion("kind", [
       widthM: z.number().min(2).max(10),
     }),
     geometry: lineGeometrySchema,
+  }),
+  z.object({
+    id: z.uuid(),
+    kind: z.literal("urban_object"),
+    properties: z
+      .strictObject({
+        label,
+        objectType: z.enum(revisionObjectKinds),
+        heightM: z.number().min(0.3).max(8),
+      })
+      .refine(
+        ({ objectType, heightM }) =>
+          (objectType !== "bench" && objectType !== "planter") || heightM <= 3,
+        { path: ["heightM"] },
+      ),
+    geometry: polygonGeometrySchema,
   }),
 ]);
 

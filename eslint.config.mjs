@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "test-results/**",
     "public/maplibre-gl-worker.mjs",
+    "public/terrain-model/**",
+    "public/terrain-assets/basis/**",
     "next-env.d.ts",
   ]),
 ]);

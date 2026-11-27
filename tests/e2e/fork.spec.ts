@@ -7,6 +7,7 @@ import {
   api,
   createBranch,
   featureList,
+  localSupabaseDbContainer,
   openEditor,
   signIn,
 } from "./helpers";
@@ -48,7 +49,7 @@ function setModeration(publicationId: string, state: "hidden" | "visible") {
   expect(publicationId).toMatch(/^[0-9a-f-]{36}$/);
   execFileSync("docker", [
     "exec",
-    "supabase_db_KIROWEEN-2",
+    localSupabaseDbContainer(),
     "psql",
     "-U",
     "postgres",
@@ -313,7 +314,7 @@ function forksOf(publicationId: string): number {
   expect(publicationId).toMatch(/^[0-9a-f-]{36}$/);
   const out = execFileSync("docker", [
     "exec",
-    "supabase_db_KIROWEEN-2",
+    localSupabaseDbContainer(),
     "psql",
     "-U",
     "postgres",

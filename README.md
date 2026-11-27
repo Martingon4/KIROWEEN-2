@@ -24,7 +24,7 @@ The current slice provides:
 
 - Promoting a visible proposal to a dossier, with milestones, status changes backed by evidence, and four downloadable exports (see "Dossiers and exports" below).
 
-Release work is planned in a later Spec under `.kiro/specs/` and is not implemented yet. The closure check of Spec 05 passed on Node 24 (unit 462, pgTAP 2835, Playwright 135).
+La [Spec 06](.kiro/specs/06-delivery/tasks.md) reúne el guion, el texto de Devpost y los pasos de publicación. El [registro de comprobaciones](docs/progress.md) identifica qué versión se probó y los resultados de cada etapa.
 
 ## Publish a revision
 
@@ -113,18 +113,29 @@ The moderator test account uses `FTC_MODERATOR_EMAIL` and `FTC_MODERATOR_PASSWOR
 - Docker for the local Supabase stack
 - Google Chrome for browser checks
 
-The current development machine has Node 26. Validation on Node 24 remains required before release.
-
-## Start locally
+## Arranque local
 
 ```bash
 nvm use
 npm ci
-cp .env.example .env.local
-npm run dev
+DO_NOT_TRACK=1 npx supabase start
+npm run configure:local
+npm run build && npm run start -- --port 3100
 ```
 
-Open `http://localhost:3000`. The root redirects to `/es`; `/en` provides the English route.
+Abre [la aplicación local](http://127.0.0.1:3100/es). La versión en inglés está en `/en`. Después de un `supabase db reset` local, ejecuta `npm run provision:local` para restablecer las cuentas de prueba. Sigue el [handoff](docs/HANDOFF.md) para la validación de entrega.
+
+## Diseñar a partir de una foto
+
+En `/es/terrain` y `/en/terrain`, el simulador sugiere un contorno a partir del color del suelo visible. Confirma el contorno o redibújalo sobre la foto. Puedes marcar dos extremos y un ancho para reservar un paso, y añadir medidas conocidas en los ajustes. La propuesta A parte de un módulo comunitario cerrado con puerta, ventanas y cubierta; la B plantea un pabellón público abierto. Ambas añaden acceso y equipamiento cuando cabe. Los módulos se ofrecen en tres tamaños y la app comprueba sus huellas, las colisiones y el paso al editar el contorno o la escala. La primera propuesta viable se muestra al abrir la simulación.
+
+El cálculo busca espacio construible, elige un módulo del catálogo que quepa y distribuye componentes complementarios sin ocupar el paso. Si la foto muestra una línea verde bajo el cielo, dibuja árboles de fondo como contexto aproximado, separados de la propuesta. El suelo usa colores muestreados del área visible incluso cuando falta el modelo opcional de profundidad. El contorno, el arbolado y la escala sin medidas son aproximados. Una foto no identifica con fiabilidad obstáculos, pendientes, permisos, estructura portante ni distancias ocultas; la persona debe revisar el resultado. Es una propuesta conceptual hipotética, no un plano ejecutable. El diseño se guarda en el navegador.
+
+### Relieve desde una foto
+
+Después de `npm ci`, ejecuta `npm run setup:terrain-depth` antes de compilar si quieres habilitar el relieve en `/es/terrain` y `/en/terrain`. El comando prepara alrededor de 42 MB de pesos y WebAssembly en `public/terrain-model/`. Incluye esa carpeta en el entorno que sirva la aplicación. La foto se analiza en el navegador y los diseños guardados conservan la malla, con escala aproximada salvo donde se indiquen medidas.
+
+Las vistas laterales muestran el relieve inferido de la cara visible. La foto por sí sola no permite recuperar las partes ocultas.
 
 ## Checks
 

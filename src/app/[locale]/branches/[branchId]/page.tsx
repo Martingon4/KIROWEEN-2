@@ -136,12 +136,15 @@ async function EditorContent({ params }: EditorPageProps) {
         <EditorLoader
           locale={locale}
           messages={copy.editor}
+          perspectiveCopy={copy.terrain.perspective}
+          objectsCopy={copy.terrain}
           head={head}
           publications={publications}
           userId={claims.claims.sub}
           bounds={pilotSite.bounds}
           boundary={boundary}
           center={[(west + east) / 2, (south + north) / 2]}
+          pilotContext={pilotSite.osmContext}
         />
       </main>
     </>

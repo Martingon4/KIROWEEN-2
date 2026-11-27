@@ -4,6 +4,11 @@ import {
 } from "@/features/editor/coordinates";
 import { geometryTypeForKind } from "@/features/editor/defaults";
 import {
+  urbanObjectCenter,
+  urbanObjectFootprint,
+} from "@/lib/geo/urban-object";
+import type { RevisionObjectKind } from "@/lib/schemas/terrain-objects";
+import {
   interventionSchema,
   type EditableKind,
   type Intervention,
@@ -14,6 +19,7 @@ export type FormValues = {
   mode: "add" | "edit";
   id: string;
   kind: EditableKind;
+  objectType: RevisionObjectKind;
   label: string;
   heightM: string;
   canopyDiameterM: string;
@@ -24,9 +30,19 @@ export type FormValues = {
   coordinates: string;
 };
 
-export type FormField = Exclude<keyof FormValues, "mode" | "id" | "kind">;
+export type FormField = Exclude<
+  keyof FormValues,
+  "mode" | "id" | "kind" | "objectType"
+>;
 export type FieldErrorKey =
-  "label" | "number" | "timeSlot" | "format" | "count";
+  | "label"
+  | "number"
+  | "timeSlot"
+  | "format"
+  | "count"
+  | "marketTreeOverlap"
+  | "objectOverlap"
+  | "objectOutside";
 export type FieldErrors = Partial<Record<FormField, FieldErrorKey>>;
 
 export type NumericField =
@@ -47,7 +63,17 @@ export const numericFields: Record<
     { field: "moduleM2", min: 1, max: 20 },
   ],
   proposed_crossing: [{ field: "widthM", min: 2, max: 10 }],
+  urban_object: [{ field: "heightM", min: 0.3, max: 8 }],
 };
+
+export function numericFieldsFor({ kind, objectType }: FormValues) {
+  if (
+    kind === "urban_object" &&
+    (objectType === "bench" || objectType === "planter")
+  )
+    return [{ field: "heightM" as const, min: 0.3, max: 3, integer: false }];
+  return numericFields[kind];
+}
 
 export function toFormValues(
   feature: Intervention,
@@ -57,6 +83,7 @@ export function toFormValues(
     mode,
     id: feature.id,
     kind: feature.kind,
+    objectType: "bench",
     label: feature.properties.label,
     heightM: "",
     canopyDiameterM: "",
@@ -85,6 +112,16 @@ export function toFormValues(
       };
     case "proposed_crossing":
       return { ...values, widthM: String(feature.properties.widthM) };
+    case "urban_object":
+      return {
+        ...values,
+        objectType: feature.properties.objectType,
+        heightM: String(feature.properties.heightM),
+        coordinates: formatCoordinates({
+          type: "Point",
+          coordinates: urbanObjectCenter(feature.geometry.coordinates[0]),
+        }),
+      };
   }
 }
 
@@ -106,7 +143,7 @@ export function fromFormValues(values: FormValues): FormResult {
   if (!geometry.ok) errors.coordinates = geometry.reason;
 
   const properties: Record<string, unknown> = { label: values.label };
-  for (const { field, min, max, integer } of numericFields[values.kind]) {
+  for (const { field, min, max, integer } of numericFieldsFor(values)) {
     const value = toNumber(values[field]);
     if (
       !Number.isFinite(value) ||
@@ -119,12 +156,20 @@ export function fromFormValues(values: FormValues): FormResult {
     properties[field] = value;
   }
   if (values.kind === "temporary_market") properties.timeSlot = values.timeSlot;
+  if (values.kind === "urban_object") properties.objectType = values.objectType;
 
   const parsed = interventionSchema.safeParse({
     id: values.id,
     kind: values.kind,
     properties,
-    geometry: geometry.ok ? geometry.geometry : null,
+    geometry:
+      geometry.ok &&
+      values.kind === "urban_object" &&
+      geometry.geometry.type === "Point"
+        ? urbanObjectFootprint(values.objectType, geometry.geometry.coordinates)
+        : geometry.ok
+          ? geometry.geometry
+          : null,
   });
 
   if (!parsed.success) {

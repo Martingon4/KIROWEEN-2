@@ -288,7 +288,14 @@ export function MergeWorkbench({
 
   function describeConflict(conflict: MergeConflict) {
     if (isSpatial(conflict)) {
-      return fillTemplate(m.conflictTypes.exclusive_overlap, {
+      const description = conflict.kinds.includes("urban_object")
+        ? m.urbanObjectConflict
+        : conflict.kinds.includes("shade_tree")
+        ? m.marketTreeConflict
+        : conflict.kinds.includes("proposed_crossing")
+          ? m.marketCrossingConflict
+          : m.conflictTypes.exclusive_overlap;
+      return fillTemplate(description, {
         first: labelOf(conflict.featureIds[0]),
         second: labelOf(conflict.featureIds[1]),
         area: number.format(conflict.intersectionM2),
@@ -466,9 +473,11 @@ export function MergeWorkbench({
             <ul>
               {preview.warnings.map((warning, index) => (
                 <li key={index}>
-                  {fillTemplate(m.warningLine, {
-                    area: number.format(Number(warning.intersectionM2 ?? 0)),
-                  })}
+                  {Array.isArray(warning.kinds) && warning.kinds.includes("shade_tree") && !warning.kinds.includes("urban_object")
+                    ? m.marketTreeWarning
+                    : fillTemplate(m.warningLine, {
+                        area: number.format(Number(warning.intersectionM2 ?? 0)),
+                      })}
                 </li>
               ))}
             </ul>
@@ -495,6 +504,12 @@ export function MergeWorkbench({
           boundary={boundary}
           bounds={bounds}
           features={resultFeatures}
+          conflictingIds={new Set(
+            preview.conflicts
+              .filter(isSpatial)
+              .filter((conflict) => preview.unresolved.includes(conflict.id))
+              .flatMap((conflict) => conflict.featureIds),
+          )}
         />
         <ul className="editor-feature-list">
           {preview.features.map((feature) => (

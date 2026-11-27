@@ -153,6 +153,7 @@ const FEATURE_CLASS_STYLE: Record<string, string> = {
   temporary_market:
     "fill:rgba(245,158,11,.42);stroke:#92400e;stroke-width:6;stroke-dasharray:14 6",
   shade_tree: "fill:#15803d;stroke:#14532d;stroke-width:5",
+  urban_object: "fill:#cc9159;stroke:#653f24;stroke-width:3",
   proposed_crossing:
     "fill:none;stroke:#0f172a;stroke-width:14;stroke-dasharray:10 8",
 };

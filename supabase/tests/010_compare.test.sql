@@ -1,6 +1,6 @@
 begin;
 
-select plan(113);
+select plan(118);
 
 create temp table ctx (name text primary key, id uuid, doc jsonb);
 grant all on table ctx to anon, authenticated;
@@ -422,6 +422,18 @@ select is((select doc -> 'counts' from ctx where name = 'cat_old_new'), '{"equal
 update public.publications set moderation_state = 'hidden' where id = (select id from ctx where name = 'pB');
 set local role anon;
 select set_config('request.jwt.claim.sub', '', true);
+select is(
+  jsonb_array_length(public.get_shade_scene('publication:' || (select id from ctx where name = 'pA')) -> 'elements'),
+  2, 'shade scene includes both shade elements from the entire visible snapshot'
+);
+select is(
+  public.get_shade_scene('baseline:' || (select id from ctx where name = 'baseline')) -> 'elements',
+  '[]'::jsonb, 'baseline shade scene has a surface without proposal elements'
+);
+select throws_ok(
+  format($$select public.get_shade_scene('publication:%s')$$, (select id from ctx where name = 'pB')),
+  'P0002', 'snapshot_not_found', 'shade scene denies a hidden publication'
+);
 select throws_ok(
   format($$select public.compare_revisions('publication:%s', 'publication:%s')$$, (select id from ctx where name = 'pA'), (select id from ctx where name = 'pB')),
   'P0002', 'snapshot_not_found', 'anon: a hidden publication as right ref is not found'
@@ -433,6 +445,14 @@ select throws_ok(
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '94000000-0000-4000-8000-000000000001', true);
+select lives_ok(
+  format($$select public.get_shade_scene('revision:%s')$$, (select id from ctx where name = 'rB')),
+  'shade scene allows the owner to view their revision'
+);
+select throws_ok(
+  format($$select public.get_shade_scene('revision:%s')$$, (select id from ctx where name = 'rU2')),
+  'P0002', 'snapshot_not_found', 'shade scene denies another participant’s revision'
+);
 select throws_ok(
   format($$select public.compare_revisions('publication:%s', 'publication:%s')$$, (select id from ctx where name = 'pA'), (select id from ctx where name = 'pB')),
   'P0002', 'snapshot_not_found', 'the author also cannot compare their own hidden publication by publication ref'

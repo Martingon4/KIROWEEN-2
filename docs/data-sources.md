@@ -14,6 +14,14 @@
 
 See [OpenStreetMap copyright and license](https://www.openstreetmap.org/copyright) and [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/).
 
+## Entorno cartográfico del Zócalo
+
+- **Archivo:** `data/sites/zocalo-puebla/osm-context.geojson`. Recorte de la [API de OpenStreetMap](https://api.openstreetmap.org/api/0.6/map?bbox=-98.19935,19.04275,-98.19685,19.04455), recuperado el 26 de noviembre de 2026 a las 00:47 UTC.
+- **Selección:** 9 tramos de calle, 49 tramos marcados como vías peatonales o escalones, 6 geometrías de cruce y 41 contornos de edificios representados como vías cerradas. Se conservan los identificadores de OSM, los nombres disponibles y la geometría en EPSG:4326. Licencia ODbL 1.0, atribución a OpenStreetMap contributors.
+- **SHA-256:** respuesta de origen `90ff8f98a901bf2192e6b23f7fe5a62008ca73bbb40fd00967886a64c62b7a7a`. GeoJSON derivado `cadd3fbc6a2d9ae5077e9d15b228f708f8962ad24d6ab2aa11b29458b36bbed9`.
+- **Cobertura parcial.** Capa de referencia para ubicar propuestas. Los cruces que evalúa la fusión son intervenciones hipotéticas dibujadas por el usuario, con el ancho introducido en el editor. El recorte carece de un inventario verificado de anchos y condiciones de accesibilidad.
+- **Visor 3D del terreno.** Al activar la capa, el navegador consulta vías y edificios por zona aproximada. El recorte incluido se usa en el Zócalo cuando la respuesta en línea falta o queda vacía. La posición se aproxima con el centro del croquis y el norte arriba, y las alturas provienen de etiquetas disponibles o de una estimación. El guardado y el cálculo solar usan los objetos propuestos del croquis. [Consulta de zonas en Overpass](https://dev.overpass-api.de/overpass-doc/en/full_data/bbox.html), [licencia y atribución de OpenStreetMap](https://www.openstreetmap.org/copyright).
+
 ## Demonstration scenario
 
 `data/sites/zocalo-puebla/scenario.geojson` is authored for this project. Its shade and market features are hypothetical fixtures used to demonstrate comparison and conflict handling. They are not observations or municipal proposals.

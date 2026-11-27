@@ -42,6 +42,12 @@
       "file": "scenario.geojson",
       "status": "hypothetical",
       "coverage": "authored demonstration fixtures; not observed on site"
+    },
+    {
+      "id": "osm-surroundings",
+      "file": "osm-context.geojson",
+      "status": "reference",
+      "coverage": "partial map context; no verified pedestrian widths or accessibility inventory"
     }
   ]
 }

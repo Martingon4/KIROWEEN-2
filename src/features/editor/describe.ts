@@ -1,4 +1,5 @@
 import type { Intervention } from "@/lib/schemas/intervention";
+import { terrainObjects } from "@/lib/schemas/terrain-objects";
 
 export type SummaryTemplates = Record<Intervention["kind"], string>;
 
@@ -37,5 +38,13 @@ export function describeIntervention(
       return fillTemplate(templates.proposed_crossing, {
         width: number.format(feature.properties.widthM),
       });
+    case "urban_object": {
+      const { width, depth } = terrainObjects[feature.properties.objectType];
+      return fillTemplate(templates.urban_object, {
+        width: number.format(width),
+        depth: number.format(depth),
+        height: number.format(feature.properties.heightM),
+      });
+    }
   }
 }
